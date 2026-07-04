@@ -1,0 +1,23 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+
+# Working database files (KTD1/KTD9) — real personal fitness data, never committed
+data/*.fitnotes
+data/*.fitnotes-journal
+data/*.fitnotes-wal
+data/*.fitnotes-shm
+!data/.gitkeep
+
+# Real personal FitNotes backup used for local grounding/testing — never committed
+*.fitnotes
