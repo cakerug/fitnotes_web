@@ -31,6 +31,14 @@ export const EXERCISE_REFERENCE_QUERIES = [
   { label: 'barbells', sql: 'SELECT COUNT(*) AS c FROM Barbell WHERE exercise_id = ?' },
 ] as const
 
+// KTD4: routine-section references. WorkoutGroup/WorkoutGroupExercise both
+// reference RoutineSection._id with no FK constraint and had live rows in the
+// sample backup, so section deletes need the same guard as exercise/category.
+export const ROUTINE_SECTION_REFERENCE_QUERIES = [
+  { label: 'workout groups', sql: 'SELECT COUNT(*) AS c FROM WorkoutGroup WHERE routine_section_id = ?' },
+  { label: 'workout group exercises', sql: 'SELECT COUNT(*) AS c FROM WorkoutGroupExercise WHERE routine_section_id = ?' },
+] as const
+
 let workingDb: Database.Database | null = null
 
 /** Shared connection to the working DB (KTD1), used by U3+ CRUD. WAL mode per KTD1. */
