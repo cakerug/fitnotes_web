@@ -48,6 +48,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Link to="/categories" className="[&.active]:font-bold">
             Categories
           </Link>
+          <Link to="/routines" className="[&.active]:font-bold">
+            Routines
+          </Link>
         </nav>
         {children}
         <TanStackDevtools
