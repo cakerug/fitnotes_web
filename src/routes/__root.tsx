@@ -42,6 +42,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Link to="/import" className="[&.active]:font-bold">
             Import
           </Link>
+          <Link to="/exercises" className="[&.active]:font-bold">
+            Exercises
+          </Link>
+          <Link to="/categories" className="[&.active]:font-bold">
+            Categories
+          </Link>
         </nav>
         {children}
         <TanStackDevtools

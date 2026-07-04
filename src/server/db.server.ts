@@ -16,6 +16,21 @@ export const ORIGINAL_IMPORT_DB_PATH = path.join(DATA_DIR, 'original-import.fitn
 export const EXPECTED_USER_VERSION = 22
 export const CORE_TABLES = ['exercise', 'Category', 'Routine'] as const
 
+// KTD4: exhaustive, pinned reference list for the delete guard. Tables/columns
+// that reference exercise._id or Category._id, verified against the sample schema.
+export const CATEGORY_REFERENCE_QUERIES = [
+  { label: 'exercises', sql: 'SELECT COUNT(*) AS c FROM exercise WHERE category_id = ?' },
+] as const
+
+export const EXERCISE_REFERENCE_QUERIES = [
+  { label: 'routine section exercises', sql: 'SELECT COUNT(*) AS c FROM RoutineSectionExercise WHERE exercise_id = ?' },
+  { label: 'training log entries', sql: 'SELECT COUNT(*) AS c FROM training_log WHERE exercise_id = ?' },
+  { label: 'goals', sql: 'SELECT COUNT(*) AS c FROM Goal WHERE exercise_id = ?' },
+  { label: 'workout group exercises', sql: 'SELECT COUNT(*) AS c FROM WorkoutGroupExercise WHERE exercise_id = ?' },
+  { label: 'exercise graph favourites', sql: 'SELECT COUNT(*) AS c FROM ExerciseGraphFavourite WHERE exercise_id = ?' },
+  { label: 'barbells', sql: 'SELECT COUNT(*) AS c FROM Barbell WHERE exercise_id = ?' },
+] as const
+
 let workingDb: Database.Database | null = null
 
 /** Shared connection to the working DB (KTD1), used by U3+ CRUD. WAL mode per KTD1. */
@@ -79,6 +94,38 @@ export function validateBackupFile(filePath: string): BackupValidation {
   } finally {
     db.close()
   }
+}
+
+export type ReferenceCheck = { label: string; count: number }
+
+/** KTD4: runs a pinned reference-query list against an id, returning only non-zero hits. */
+export function findReferences(
+  db: Database.Database,
+  queries: ReadonlyArray<{ label: string; sql: string }>,
+  id: number,
+): Array<ReferenceCheck> {
+  return queries
+    .map((q) => ({ label: q.label, count: (db.prepare(q.sql).get(id) as { c: number }).c }))
+    .filter((r) => r.count > 0)
+}
+
+/**
+ * KTD4: RepMaxGridFavourite.exercise_ids stores a comma-separated string, not
+ * a normal integer FK column, so it needs its own parse-and-check rather than
+ * a plain `WHERE exercise_id = ?`.
+ */
+export function findRepMaxGridReferences(db: Database.Database, exerciseId: number): ReferenceCheck | null {
+  const rows = db.prepare('SELECT exercise_ids FROM RepMaxGridFavourite').all() as Array<{
+    exercise_ids: string
+  }>
+  const idString = String(exerciseId)
+  const count = rows.filter((r) =>
+    r.exercise_ids
+      .split(',')
+      .map((s) => s.trim())
+      .includes(idString),
+  ).length
+  return count > 0 ? { label: 'rep max grid favourites', count } : null
 }
 
 /** Runs PRAGMA integrity_check against a DB file. Used by U5's pre-export verification. */
