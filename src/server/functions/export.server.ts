@@ -1,7 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
-import { CORE_TABLES, DATA_DIR, ORIGINAL_IMPORT_DB_PATH, WORKING_DB_PATH, getWorkingDb, integrityCheck } from '../db.server'
+import {
+  CORE_TABLES,
+  DATA_DIR,
+  ORIGINAL_IMPORT_DB_PATH,
+  WORKING_DB_PATH,
+  getWorkingDb,
+  integrityCheck,
+} from '../db.server'
 
 // Tables this app edits (U3/U4). Everything else in the schema is passthrough
 // data (R2) and must have identical row counts to the KTD9 baseline — a
@@ -16,8 +23,7 @@ const MANAGED_TABLES = [
 ] as const
 
 export type ExportResult =
-  | { status: 'success'; filePath: string }
-  | { status: 'error'; reason: string; message: string }
+  { status: 'success'; filePath: string } | { status: 'error'; reason: string; message: string }
 
 /**
  * KTD1/KTD9: copies the working DB to a temp file (never the live file, to
@@ -27,7 +33,11 @@ export type ExportResult =
  */
 export function prepareExport(): ExportResult {
   if (!fs.existsSync(WORKING_DB_PATH)) {
-    return { status: 'error', reason: 'no-working-db', message: 'No working database exists yet — import a backup first.' }
+    return {
+      status: 'error',
+      reason: 'no-working-db',
+      message: 'No working database exists yet — import a backup first.',
+    }
   }
 
   // KTD1: the working DB runs in WAL mode, so recent writes can still be
@@ -58,12 +68,15 @@ export function cleanupExportFile(filePath: string): void {
   fs.rmSync(`${filePath}-shm`, { force: true })
 }
 
-function validateExportCandidate(filePath: string): { status: 'success' } | { status: 'error'; reason: string; message: string } {
+function validateExportCandidate(
+  filePath: string,
+): { status: 'success' } | { status: 'error'; reason: string; message: string } {
   if (!integrityCheck(filePath)) {
     return {
       status: 'error',
       reason: 'integrity-check-failed',
-      message: 'The working database failed a SQLite integrity check — export blocked to avoid handing back a corrupted file.',
+      message:
+        'The working database failed a SQLite integrity check — export blocked to avoid handing back a corrupted file.',
     }
   }
 

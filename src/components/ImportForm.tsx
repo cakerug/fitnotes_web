@@ -56,8 +56,8 @@ export function ImportForm({ onImported }: { onImported?: () => void }) {
       {needsConfirmation && (
         <div className="mt-6 rounded border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-900">
-            A working copy already exists. Re-importing replaces it and discards any edits made
-            since your last export — this can&apos;t be undone.
+            A working copy already exists. Re-importing replaces it and discards any edits made since your last export —
+            this can&apos;t be undone.
           </p>
           <button
             type="button"
@@ -71,9 +71,7 @@ export function ImportForm({ onImported }: { onImported?: () => void }) {
       )}
 
       {result?.status === 'error' && (
-        <div className="mt-6 rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
-          {result.message}
-        </div>
+        <div className="mt-6 rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">{result.message}</div>
       )}
 
       {result?.status === 'success' && (

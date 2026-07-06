@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react'
 import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { deleteExerciseFn, listExerciseLogStatsFn, listExercisesFn } from '../../server/functions/exercises'
-import { createCategoryFn, deleteCategoryFn, listCategoriesFn, updateCategoryFn } from '../../server/functions/categories'
+import {
+  createCategoryFn,
+  deleteCategoryFn,
+  listCategoriesFn,
+  updateCategoryFn,
+} from '../../server/functions/categories'
 import { hasWorkingDbFn } from '../../server/functions/dashboard'
 import type { CategoryDTO } from '../../server/functions/categories.server'
 import type { ExerciseDTO, ExerciseLogStatsDTO } from '../../server/functions/exercises.server'
@@ -56,10 +61,7 @@ function CategorySwatch({ colour }: { colour: number }) {
 function CategoryColorPicker({ category, onPick }: { category: CategoryDTO; onPick: (hex: string) => void }) {
   return (
     <details className="relative">
-      <summary
-        title="Change colour"
-        className="cursor-pointer list-none rounded"
-      >
+      <summary title="Change colour" className="cursor-pointer list-none rounded">
         <CategorySwatch colour={category.colour} />
       </summary>
       <div className="absolute left-0 z-10 mt-2 grid w-44 grid-cols-5 gap-2 rounded border border-gray-200 bg-white p-3 shadow-md">

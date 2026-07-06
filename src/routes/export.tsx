@@ -54,9 +54,9 @@ function ExportPage() {
     <div className="mx-auto max-w-xl p-8">
       <h1 className="text-2xl font-bold">Export FitNotes backup</h1>
       <p className="mt-2 text-gray-600">
-        Downloads the current working database as a <code>.fitnotes</code> file, ready to restore
-        back into the Android app. Before downloading, this runs an integrity check and confirms
-        every untouched table still matches its row count from import.
+        Downloads the current working database as a <code>.fitnotes</code> file, ready to restore back into the Android
+        app. Before downloading, this runs an integrity check and confirms every untouched table still matches its row
+        count from import.
       </p>
 
       {diffSummary.status === 'ready' && (
@@ -94,9 +94,7 @@ function ExportPage() {
         {pending ? 'Preparing export…' : 'Export backup'}
       </button>
 
-      {error && (
-        <div className="mt-6 rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">{error}</div>
-      )}
+      {error && <div className="mt-6 rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">{error}</div>}
     </div>
   )
 }

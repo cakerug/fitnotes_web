@@ -37,7 +37,12 @@ function rowsEqual(a: Row, b: Row): boolean {
 }
 
 /** Row-by-row comparison against the KTD9 baseline — nothing in the schema tracks edit history. */
-function diffTable(workingDb: Database.Database, baselineDb: Database.Database, table: string, nameColumn?: string): EntityDiff {
+function diffTable(
+  workingDb: Database.Database,
+  baselineDb: Database.Database,
+  table: string,
+  nameColumn?: string,
+): EntityDiff {
   const working = rowsById(workingDb, table)
   const baseline = rowsById(baselineDb, table)
 

@@ -78,9 +78,7 @@ function atomicReplace(sourcePath: string, destPath: string): void {
   fs.renameSync(stagingPath, destPath)
 }
 
-function describeValidationError(
-  validation: Extract<ReturnType<typeof validateBackupFile>, { valid: false }>,
-): string {
+function describeValidationError(validation: Extract<ReturnType<typeof validateBackupFile>, { valid: false }>): string {
   switch (validation.reason) {
     case 'not-a-sqlite-file':
       return 'This file is not a readable SQLite database.'

@@ -56,7 +56,11 @@ function RoutinesListPage() {
       <ul className="mt-6 divide-y divide-gray-200 rounded border border-gray-200">
         {routines.map((routine) => (
           <li key={routine.id} className="flex items-center justify-between p-3">
-            <Link to="/routines/$routineId" params={{ routineId: String(routine.id) }} className="text-sm font-medium text-blue-700">
+            <Link
+              to="/routines/$routineId"
+              params={{ routineId: String(routine.id) }}
+              className="text-sm font-medium text-blue-700"
+            >
               {routine.name}
             </Link>
             <div className="flex items-center gap-3">

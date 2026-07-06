@@ -58,8 +58,7 @@ export function listRoutines(): Array<RoutineSummaryDTO> {
 export function getRoutine(id: number): RoutineDTO {
   const db = getWorkingDb()
   const routine = db.prepare('SELECT * FROM Routine WHERE _id = ?').get(id) as
-    | { _id: number; name: string; notes: string | null }
-    | undefined
+    { _id: number; name: string; notes: string | null } | undefined
   if (!routine) throw new Error(`Routine ${id} not found.`)
 
   const sections = db
@@ -84,7 +83,9 @@ export function getRoutine(id: number): RoutineDTO {
 
     const exerciseDTOs: Array<SectionExerciseDTO> = exercises.map((ex) => {
       const sets = db
-        .prepare('SELECT * FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ? ORDER BY sort_order ASC')
+        .prepare(
+          'SELECT * FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ? ORDER BY sort_order ASC',
+        )
         .all(ex._id) as Array<{
         _id: number
         metric_weight: number
@@ -260,7 +261,9 @@ export function addSet(input: { sectionExerciseId: number } & SetInput): SetDTO 
 
   const create = db.transaction(() => {
     const maxSort = db
-      .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ?')
+      .prepare(
+        'SELECT COALESCE(MAX(sort_order), -1) AS m FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ?',
+      )
       .get(input.sectionExerciseId) as { m: number }
     const result = db
       .prepare(

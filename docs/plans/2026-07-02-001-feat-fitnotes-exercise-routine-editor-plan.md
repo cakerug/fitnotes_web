@@ -42,21 +42,26 @@ FitNotes is an Android-only workout tracker. Editing and cleaning up the exercis
 ### Requirements
 
 **Import**
+
 - R1. The app imports an existing `.fitnotes` SQLite backup as a one-time seed, loading exercises, categories, and routines (with their sections, exercises, and target sets) into the web app's data store.
 - R2. Import retains all other data present in the backup (training log, body weight, goals, measurements, settings, and any other tables) even though the web app doesn't expose it, so that data survives unchanged through to export.
 
 **Exercise management**
+
 - R3. Users can view, add, edit, and delete exercises, including name and category assignment.
 - R4. Users can view, add, edit, and delete categories used to group exercises, managed inline from the exercise list rather than a separate categories page. Category reordering is descoped (see Scope Boundaries) — categories keep whatever `sort_order` they already have.
 
 **Routine management**
+
 - R5. Users can view, add, edit, and delete routines, including their sections.
 - R6. Within a routine section, users can add, edit, remove, and reorder exercises and their target sets.
 
 **Export**
+
 - R7. Users can export the current exercises, categories, and routines (as edited in the web app), merged with the untouched imported data, into a new `.fitnotes`-format SQLite file suitable for restoring into the Android app.
 
 **Environment & access**
+
 - R8. The app runs locally for a single trusted user; no authentication or multi-user access control is required.
 
 ### Key Flows
@@ -81,6 +86,7 @@ FitNotes is an Android-only workout tracker. Editing and cleaning up the exercis
 ### Scope Boundaries
 
 **Deferred for later:**
+
 - Training log / workout history, viewing or editing
 - Body measurements, goals, graphs/analysis, calendar, personal records, comments, workout groups
 - Rest timer, 1RM calculator, plate/barbell calculators
@@ -88,6 +94,7 @@ FitNotes is an Android-only workout tracker. Editing and cleaning up the exercis
 - Category reordering. The standalone categories page (with its move-up/move-down controls, KTD6) was collapsed into the exercise list once the exercise view grew a category sidebar/detail layout, and reordering didn't carry over — it wasn't worth the UI real estate on a page whose primary job is browsing exercises. Categories keep whatever manual order they already have; `sort_order` is still respected on read (the sidebar and groupings order by it), just no longer user-adjustable. Can be reintroduced later without a schema change if it turns out to matter.
 
 **Outside this product's identity:**
+
 - Multi-user accounts, authentication, or remote/hosted access — this is a single-user, local-only tool, not a hosted product.
 
 ### Dependencies / Assumptions
@@ -102,10 +109,10 @@ FitNotes is an Android-only workout tracker. Editing and cleaning up the exercis
 ### Key Technical Decisions
 
 - **KTD1 — Working database is an in-place edited copy of the imported backup**, using FitNotes' own schema rather than a separate app-specific data model. Import copies the uploaded file to a working location; all exercise/category/routine edits run as SQL against that same file. Export is then "hand back the current working file," not a merge step. This makes R2 (untouched tables survive) automatic by construction, since passthrough tables are never written to. Architecture review confirmed this is the right call for this shape of problem: the rejected alternative (a separate app-owned data model plus an export-time merge step) would have to re-derive FitNotes' full schema knowledge by hand to avoid silently dropping unmanaged-table data — a worse failure mode than anything the direct-edit approach risks. Two companion decisions harden it: the working DB is opened with `PRAGMA journal_mode=WAL`, and import validates `PRAGMA user_version` against the known-good value (22, per the sample backup) and fails loudly on mismatch rather than assuming a differently-versioned FitNotes export is compatible.
-  - **WAL rationale, precisely:** WAL mode's actual purpose here is concurrency, not crash-safety — SQLite's default rollback-journal mode is *equally* crash-safe (it recovers via a journal file instead of replaying committed WAL frames), and neither mode protects against filesystem/disk failure, since there's no second copy or replica involved. The reason to use it in a single-user app with no true concurrent users is that a single page load already fires overlapping reads (e.g. the exercises route loads exercises and categories via `Promise.all`), and router preloading or multiple tabs can add more. Rollback-journal mode would still be correct under that overlap, just serialized (readers/writer block each other); WAL lets them proceed concurrently at effectively no cost. So: adopted as cheap insurance against a real-but-minor case (overlapping requests), not a bug fix or a durability requirement.
+  - **WAL rationale, precisely:** WAL mode's actual purpose here is concurrency, not crash-safety — SQLite's default rollback-journal mode is _equally_ crash-safe (it recovers via a journal file instead of replaying committed WAL frames), and neither mode protects against filesystem/disk failure, since there's no second copy or replica involved. The reason to use it in a single-user app with no true concurrent users is that a single page load already fires overlapping reads (e.g. the exercises route loads exercises and categories via `Promise.all`), and router preloading or multiple tabs can add more. Rollback-journal mode would still be correct under that overlap, just serialized (readers/writer block each other); WAL lets them proceed concurrently at effectively no cost. So: adopted as cheap insurance against a real-but-minor case (overlapping requests), not a bug fix or a durability requirement.
 - **KTD2 — Framework: TanStack Start (React), confirmed against current docs.** A single Vite-based app combining file-based UI routing (TanStack Router) with server-side "server functions" for all SQLite access, so there's no separate backend service to stand up or deploy. Routes live in `src/routes/` with a required `src/routes/__root.tsx` layout; the router is configured in `src/router.tsx` (an exported `getRouter()` factory); `routeTree.gen.ts` is generated, never hand-written. Scaffold via the current TanStack CLI (`@tanstack/cli`) rather than the older `create-tsrouter-app` entry point. TanStack Start is at Release Candidate stage (feature-complete, stable API) but ships multiple releases a day — pin an exact dependency version rather than a range, and re-check the scaffold command against current docs if implementation starts materially later than this plan.
 - **KTD3 — SQLite access via `better-sqlite3`**, a mature synchronous native driver, called only from server functions. Confirmed: TanStack Start's server functions run in a Node.js runtime by default (file-system and native-module access, including `better-sqlite3`) unless the project opts into an edge deployment target (e.g. Cloudflare Workers) — this app does neither, so no runtime concern. Node's newer built-in `sqlite` module remains a lighter-weight alternative worth a quick look at implementation time if native-module install friction shows up, but isn't the v1 default.
-- **KTD4 — Deletion guard, with an explicit reference table list.** Deleting an exercise or category blocks with an explanatory message, rather than cascading or silently orphaning references, if any reference exists. Because the source schema declares no `FOREIGN KEY` constraints anywhere, this guard *is* the referential-integrity layer, not a UX nicety — so the reference set must be exhaustive and pinned, not illustrative. For a category: `exercise.category_id` (`NOT NULL`). For an exercise: `RoutineSectionExercise.exercise_id`, `training_log.exercise_id`, `Goal.exercise_id`, `WorkoutGroupExercise.exercise_id`, `ExerciseGraphFavourite.exercise_id`, `Barbell.exercise_id`, and `RepMaxGridFavourite.exercise_ids` — the last one stored as a comma-separated string, not a plain integer column, so it needs its own parse-and-check rather than a normal `WHERE exercise_id = ?`. **For a routine section (deleted via U4): `WorkoutGroup.routine_section_id` and `WorkoutGroupExercise.routine_section_id`** — doc review confirmed both reference `RoutineSection._id` with no FK constraint and have live rows in the sample backup (3 and 18 respectively), so a section delete needs the same guard as an exercise/category delete, not the exemption the Assumptions section originally claimed. This list is pinned to the schema version checked in KTD1 and needs re-verifying if that version guard ever needs to accept a newer schema. Resolves the field/behavior question this document previously deferred.
+- **KTD4 — Deletion guard, with an explicit reference table list.** Deleting an exercise or category blocks with an explanatory message, rather than cascading or silently orphaning references, if any reference exists. Because the source schema declares no `FOREIGN KEY` constraints anywhere, this guard _is_ the referential-integrity layer, not a UX nicety — so the reference set must be exhaustive and pinned, not illustrative. For a category: `exercise.category_id` (`NOT NULL`). For an exercise: `RoutineSectionExercise.exercise_id`, `training_log.exercise_id`, `Goal.exercise_id`, `WorkoutGroupExercise.exercise_id`, `ExerciseGraphFavourite.exercise_id`, `Barbell.exercise_id`, and `RepMaxGridFavourite.exercise_ids` — the last one stored as a comma-separated string, not a plain integer column, so it needs its own parse-and-check rather than a normal `WHERE exercise_id = ?`. **For a routine section (deleted via U4): `WorkoutGroup.routine_section_id` and `WorkoutGroupExercise.routine_section_id`** — doc review confirmed both reference `RoutineSection._id` with no FK constraint and have live rows in the sample backup (3 and 18 respectively), so a section delete needs the same guard as an exercise/category delete, not the exemption the Assumptions section originally claimed. This list is pinned to the schema version checked in KTD1 and needs re-verifying if that version guard ever needs to accept a newer schema. Resolves the field/behavior question this document previously deferred.
 - **KTD5 — Exercise editing field scope.** Exposes `name`, `category`, `notes`, and `weight_increment` as user-editable. Other technical fields (`exercise_type_id`, `default_rest_time`, `default_graph_id`, `weight_unit_id`, `is_favourite`) are preserved as imported but not exposed for editing in v1 — they have no clear UI value for the exercise-cleanup use case and can be added later without a schema change. `_id` fields are never editable, which keeps this decision from colliding with KTD4's reference tracking.
 - **KTD6 — Reordering uses move-up/move-down controls**, not drag-and-drop, for routine-section exercises and target sets within a section. Keeps v1 dependency-light; drag-and-drop can be layered on later without an API or schema change. Originally also covered categories (via a dedicated categories page); that page was later collapsed into the exercise list and category reordering was dropped from scope in the process — see Scope Boundaries.
 - **KTD7 — Styling via Tailwind CSS**, the common low-overhead pairing with TanStack Start starter projects; avoids hand-rolling a design system for a single-user tool.
@@ -131,7 +138,7 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 
 ### Assumptions
 
-- Deleting a routine or a routine-section-exercise does not need the same reference guard as KTD4 — unlike a routine *section*, they aren't referenced by other passthrough tables. (Doc review found routine *sections* are referenced by `WorkoutGroup`/`WorkoutGroupExercise` with live data, so that case is now covered by KTD4 directly, not exempted here.)
+- Deleting a routine or a routine-section-exercise does not need the same reference guard as KTD4 — unlike a routine _section_, they aren't referenced by other passthrough tables. (Doc review found routine _sections_ are referenced by `WorkoutGroup`/`WorkoutGroupExercise` with live data, so that case is now covered by KTD4 directly, not exempted here.)
 - Upload size for the imported backup stays in the personal-use range (the sample backup is ~120KB; years of one person's training history is unlikely to reach even low tens of MB). TanStack Start's server functions currently buffer the full request body in memory with no framework-level size limit (confirmed open as of this writing — see Sources), so this assumption is load-bearing for U2 rather than enforced by the framework; U2 adds its own lightweight size sanity check rather than relying on one.
 
 ### Risks & Dependencies
@@ -257,12 +264,12 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 
 ## Verification Contract
 
-| Command | Purpose | Applies to |
-|---|---|---|
-| `npm run typecheck` | TypeScript type checking | All units |
-| `npm test` | Runs the test suite (server function and data-layer scenarios) | U2-U5 |
-| `npm run build` | Production build sanity check | All units |
-| `npm run dev` | Manual smoke test of the running app | All units |
+| Command             | Purpose                                                        | Applies to |
+| ------------------- | -------------------------------------------------------------- | ---------- |
+| `npm run typecheck` | TypeScript type checking                                       | All units  |
+| `npm test`          | Runs the test suite (server function and data-layer scenarios) | U2-U5      |
+| `npm run build`     | Production build sanity check                                  | All units  |
+| `npm run dev`       | Manual smoke test of the running app                           | All units  |
 
 ## Definition of Done
 
@@ -277,9 +284,11 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 ## Open Questions
 
 **Resolved during implementation:**
+
 - Exact copy for the delete-guard error message (KTD4) and the re-import confirmation warning (U2) — both written during U2/U3. See the blocked-delete messages in `exercises/index.tsx` (covers both exercise and, after the categories page was collapsed into it, category deletes) and `routines/$routineId.tsx`, and the re-import confirmation banner in `ImportForm.tsx` (U6 moved this out of the now-removed `import.tsx` route).
 
 **Still open:**
+
 - Whether the exported SQLite file needs to exactly match FitNotes' schema/pragma expectations (`user_version`, schema version, table set) for the Android app's restore feature to accept it. The in-place working-DB approach (KTD1), the schema-version guard, and U5's pre-export integrity/row-count checks make this likely but not certain, since the working DB is a copy of a real backup rather than a synthesized one and none of those checks can see how Android's restore code itself parses the file. Verify by actually restoring an exported file into the Android app before relying on this tool for real edits — if restore fails, revisit KTD1. **This is the one remaining item — only verifiable on your device, per the Goal Capsule's "Tail ownership" note.**
 
 ---

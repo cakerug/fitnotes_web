@@ -7,9 +7,7 @@ export type CategoryDTO = {
   sortOrder: number
 }
 
-export type DeleteResult =
-  | { status: 'success' }
-  | { status: 'blocked'; references: Array<ReferenceCheck> }
+export type DeleteResult = { status: 'success' } | { status: 'blocked'; references: Array<ReferenceCheck> }
 
 type CategoryRow = { _id: number; name: string; colour: number; sort_order: number }
 

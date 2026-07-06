@@ -16,8 +16,7 @@ function Home() {
       <div className="mx-auto max-w-xl p-8">
         <h1 className="text-2xl font-bold">FitNotes editor</h1>
         <p className="mt-2 text-gray-600">
-          No working copy yet. Import a <code>.fitnotes</code> backup exported from the Android
-          app to get started.
+          No working copy yet. Import a <code>.fitnotes</code> backup exported from the Android app to get started.
         </p>
         <ImportForm onImported={() => router.invalidate()} />
       </div>
@@ -35,7 +34,9 @@ function Home() {
         <div className="flex justify-between p-3">
           <dt className="text-gray-500">Latest logged workout</dt>
           <dd>
-            {summary.latestWorkoutDate ? new Date(summary.latestWorkoutDate).toLocaleDateString() : 'No workouts logged yet'}
+            {summary.latestWorkoutDate
+              ? new Date(summary.latestWorkoutDate).toLocaleDateString()
+              : 'No workouts logged yet'}
           </dd>
         </div>
         <div className="flex justify-between p-3">

@@ -33,8 +33,7 @@ describe('category CRUD', () => {
   it('edge case: deleting a category with exercises still assigned is blocked (KTD4)', () => {
     const db = ctx.dbModule.getWorkingDb()
     const referenced = db.prepare('SELECT DISTINCT category_id FROM exercise LIMIT 1').get() as
-      | { category_id: number }
-      | undefined
+      { category_id: number } | undefined
     expect(referenced).toBeDefined()
 
     const result = categoriesServer.deleteCategory(referenced!.category_id)

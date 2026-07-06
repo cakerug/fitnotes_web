@@ -66,9 +66,8 @@ describe('prepareExport', () => {
 
     const exported = new Database(result.filePath, { readonly: true, fileMustExist: true })
     try {
-      const trainingLogCountAfter = (
-        exported.prepare('SELECT COUNT(*) AS c FROM training_log').get() as { c: number }
-      ).c
+      const trainingLogCountAfter = (exported.prepare('SELECT COUNT(*) AS c FROM training_log').get() as { c: number })
+        .c
       expect(trainingLogCountAfter).toBe(trainingLogCountBefore)
 
       const joined = exported
@@ -141,9 +140,12 @@ describe('prepareExport', () => {
   it('edge case: export is blocked if a passthrough table row count differs from the KTD9 baseline', () => {
     const db = ctx.dbModule.getWorkingDb()
     const exerciseId = (db.prepare('SELECT _id FROM exercise LIMIT 1').get() as { _id: number })._id
-    db.prepare(
-      'INSERT INTO training_log (exercise_id, date, metric_weight, reps) VALUES (?, ?, ?, ?)',
-    ).run(exerciseId, '2026-01-01', 100, 10)
+    db.prepare('INSERT INTO training_log (exercise_id, date, metric_weight, reps) VALUES (?, ?, ?, ?)').run(
+      exerciseId,
+      '2026-01-01',
+      100,
+      10,
+    )
 
     const result = prepareExport()
     expect(result.status).toBe('error')

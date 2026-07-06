@@ -48,8 +48,7 @@ describe('exercise CRUD', () => {
   it('edge case: deleting an exercise with training-log history is blocked (KTD4)', () => {
     const db = ctx.dbModule.getWorkingDb()
     const referenced = db.prepare('SELECT DISTINCT exercise_id FROM training_log LIMIT 1').get() as
-      | { exercise_id: number }
-      | undefined
+      { exercise_id: number } | undefined
     expect(referenced).toBeDefined()
 
     const result = exercisesServer.deleteExercise(referenced!.exercise_id)
@@ -97,8 +96,7 @@ describe('exercise CRUD', () => {
   it('happy path: listExerciseLogStats aggregates count and last logged date per exercise', () => {
     const db = ctx.dbModule.getWorkingDb()
     const referenced = db.prepare('SELECT DISTINCT exercise_id FROM training_log LIMIT 1').get() as
-      | { exercise_id: number }
-      | undefined
+      { exercise_id: number } | undefined
     expect(referenced).toBeDefined()
 
     const expected = db

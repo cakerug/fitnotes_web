@@ -37,7 +37,9 @@ describe('routine CRUD', () => {
     const routine = routinesServer.createRoutine({ name: 'Reorder Test' })
     const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })
     const exercises = exercisesServer.listExercises().slice(0, 3)
-    const sectionExercises = exercises.map((e) => routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: e.id }))
+    const sectionExercises = exercises.map((e) =>
+      routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: e.id }),
+    )
 
     const reversedIds = [...sectionExercises].reverse().map((se) => se.id)
     routinesServer.reorderSectionExercises({ orderedIds: reversedIds })
@@ -130,9 +132,8 @@ describe('routine CRUD', () => {
 
     const db = ctx.dbModule.getWorkingDb()
     const setCountBefore = (db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExerciseSet').get() as { c: number }).c
-    const exerciseCountBefore = (
-      db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExercise').get() as { c: number }
-    ).c
+    const exerciseCountBefore = (db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExercise').get() as { c: number })
+      .c
 
     expect(() => {
       const doomed = db.transaction((sectionExerciseId: number) => {
@@ -143,9 +144,7 @@ describe('routine CRUD', () => {
     }).toThrow('simulated failure')
 
     const setCountAfter = (db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExerciseSet').get() as { c: number }).c
-    const exerciseCountAfter = (
-      db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExercise').get() as { c: number }
-    ).c
+    const exerciseCountAfter = (db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExercise').get() as { c: number }).c
     expect(setCountAfter).toBe(setCountBefore)
     expect(exerciseCountAfter).toBe(exerciseCountBefore)
   })

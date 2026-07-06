@@ -110,7 +110,11 @@ function AddSectionForm({ routineId, onAdded }: { routineId: number; onAdded: ()
         placeholder="New section name"
         className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
       />
-      <button type="button" onClick={handleAdd} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+      <button
+        type="button"
+        onClick={handleAdd}
+        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+      >
         Add section
       </button>
     </div>
@@ -178,7 +182,12 @@ function SectionCard({
     <div className="rounded border border-gray-200 p-4">
       <div className="flex items-center gap-2">
         <div className="flex flex-col">
-          <button type="button" disabled={sectionIndex === 0} onClick={() => handleMoveSection(-1)} className="text-xs text-gray-500 disabled:opacity-30">
+          <button
+            type="button"
+            disabled={sectionIndex === 0}
+            onClick={() => handleMoveSection(-1)}
+            className="text-xs text-gray-500 disabled:opacity-30"
+          >
             ▲
           </button>
           <button
@@ -294,7 +303,12 @@ function SectionExerciseRow({
     <div className="rounded border border-gray-100 bg-gray-50 p-3">
       <div className="flex items-center gap-2">
         <div className="flex flex-col">
-          <button type="button" disabled={exerciseIndex === 0} onClick={() => handleMove(-1)} className="text-xs text-gray-500 disabled:opacity-30">
+          <button
+            type="button"
+            disabled={exerciseIndex === 0}
+            onClick={() => handleMove(-1)}
+            className="text-xs text-gray-500 disabled:opacity-30"
+          >
             ▲
           </button>
           <button
@@ -322,7 +336,12 @@ function SectionExerciseRow({
       <ul className="mt-2 space-y-1">
         {sectionExercise.sets.map((set, setIndex) => (
           <li key={set.id} className="flex items-center gap-2 text-sm">
-            <button type="button" disabled={setIndex === 0} onClick={() => handleReorderSets(setIndex, -1)} className="text-xs text-gray-400 disabled:opacity-30">
+            <button
+              type="button"
+              disabled={setIndex === 0}
+              onClick={() => handleReorderSets(setIndex, -1)}
+              className="text-xs text-gray-400 disabled:opacity-30"
+            >
               ▲
             </button>
             <button
