@@ -6,6 +6,7 @@ import { createCategoryFn, deleteCategoryFn, listCategoriesFn, updateCategoryFn 
 import { hasWorkingDbFn } from '../../server/functions/dashboard'
 import type { CategoryDTO } from '../../server/functions/categories.server'
 import type { ExerciseDTO, ExerciseLogStatsDTO } from '../../server/functions/exercises.server'
+import { CATEGORY_COLOR_PALETTE, categoryColorToHex, hexToCategoryColor } from '../../lib/categoryColors'
 
 type ExerciseSearch = { category?: number }
 
@@ -40,6 +41,50 @@ function formatLoggedStats(stats: ExerciseLogStatsDTO | undefined): string {
   })
   const times = stats.loggedCount === 1 ? '1 time' : `${stats.loggedCount} times`
   return `Logged ${times} · last ${lastLogged}`
+}
+
+function CategorySwatch({ colour }: { colour: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+      style={{ backgroundColor: categoryColorToHex(colour) }}
+    />
+  )
+}
+
+function CategoryColorPicker({ category, onPick }: { category: CategoryDTO; onPick: (hex: string) => void }) {
+  return (
+    <details className="relative">
+      <summary
+        title="Change colour"
+        className="cursor-pointer list-none rounded"
+      >
+        <CategorySwatch colour={category.colour} />
+      </summary>
+      <div className="absolute left-0 z-10 mt-2 grid w-44 grid-cols-5 gap-2 rounded border border-gray-200 bg-white p-3 shadow-md">
+        {CATEGORY_COLOR_PALETTE.map((hex) => (
+          <button
+            key={hex}
+            type="button"
+            title={hex}
+            onClick={(e) => {
+              closeMenu(e)
+              onPick(hex)
+            }}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10"
+            style={{ backgroundColor: hex }}
+          >
+            {categoryColorToHex(category.colour) === hex && (
+              <span aria-hidden="true" className="text-xs font-bold text-white drop-shadow">
+                ✓
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </details>
+  )
 }
 
 function ExerciseListPage() {
@@ -113,6 +158,11 @@ function ExerciseListPage() {
     await router.invalidate()
   }
 
+  async function handleChangeCategoryColor(category: CategoryDTO, hex: string) {
+    await updateCategory({ data: { id: category.id, name: category.name, colour: hexToCategoryColor(hex) } })
+    await router.invalidate()
+  }
+
   async function handleDeleteCategory(category: CategoryDTO) {
     setBlockedMessage(null)
     const result = await deleteCategory({ data: { id: category.id } })
@@ -160,7 +210,10 @@ function ExerciseListPage() {
                     selectedCategoryId === category.id ? 'bg-blue-50 font-medium text-blue-900' : 'text-gray-700'
                   }`}
                 >
-                  <span>{category.name}</span>
+                  <span className="flex items-center gap-2">
+                    <CategorySwatch colour={category.colour} />
+                    <span>{category.name}</span>
+                  </span>
                   <span className="text-xs text-gray-400">{exerciseCountByCategory.get(category.id) ?? 0}</span>
                 </Link>
               </li>
@@ -209,7 +262,13 @@ function ExerciseListPage() {
                       className="rounded border border-gray-300 px-2 py-1 text-sm font-semibold"
                     />
                   ) : (
-                    <h2 className="text-sm font-semibold text-gray-900">{category.name}</h2>
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <CategoryColorPicker
+                        category={category}
+                        onPick={(hex) => handleChangeCategoryColor(category, hex)}
+                      />
+                      {category.name}
+                    </h2>
                   )}
 
                   <details className="relative">
