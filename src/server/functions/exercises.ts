@@ -6,8 +6,8 @@ import {
   listExerciseLogStats,
   listExercises,
   updateExercise,
-  type ExerciseInput,
 } from './exercises.server'
+import type { ExerciseInput } from './exercises.server'
 
 export const listExercisesFn = createServerFn({ method: 'GET' })
   .validator((data: { search?: string; categoryId?: number } | undefined) => data)

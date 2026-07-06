@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
-import { importBackup, type ImportResult } from './import.server'
+import { importBackup } from './import.server'
+import type { ImportResult } from './import.server'
 
 export const importBackupFn = createServerFn({ method: 'POST' })
   .validator((data: unknown) => {

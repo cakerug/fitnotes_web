@@ -1,12 +1,16 @@
 import fs from 'node:fs'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { setupTestWorkingDb, teardownTestWorkingDb, type TestDbContext } from '../testSupport'
+import { setupTestWorkingDb, teardownTestWorkingDb } from '../testSupport'
+import type { TestDbContext } from '../testSupport'
+import type * as ExportServer from './export.server'
+import type * as ExercisesServer from './exercises.server'
+import type * as RoutinesServer from './routines.server'
 
 let ctx: TestDbContext
-let prepareExport: typeof import('./export.server').prepareExport
-let exercisesServer: typeof import('./exercises.server')
-let routinesServer: typeof import('./routines.server')
+let prepareExport: typeof ExportServer.prepareExport
+let exercisesServer: typeof ExercisesServer
+let routinesServer: typeof RoutinesServer
 
 beforeEach(async () => {
   ctx = await setupTestWorkingDb()

@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { setupTestWorkingDb, teardownTestWorkingDb, type TestDbContext } from '../testSupport'
+import { setupTestWorkingDb, teardownTestWorkingDb } from '../testSupport'
+import type { TestDbContext } from '../testSupport'
+import type * as RoutinesServer from './routines.server'
+import type * as ExercisesServer from './exercises.server'
 
 let ctx: TestDbContext
-let routinesServer: typeof import('./routines.server')
-let exercisesServer: typeof import('./exercises.server')
+let routinesServer: typeof RoutinesServer
+let exercisesServer: typeof ExercisesServer
 
 beforeEach(async () => {
   ctx = await setupTestWorkingDb()

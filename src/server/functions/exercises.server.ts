@@ -1,10 +1,5 @@
-import {
-  EXERCISE_REFERENCE_QUERIES,
-  findReferences,
-  findRepMaxGridReferences,
-  getWorkingDb,
-  type ReferenceCheck,
-} from '../db.server'
+import { EXERCISE_REFERENCE_QUERIES, findReferences, findRepMaxGridReferences, getWorkingDb } from '../db.server'
+import type { ReferenceCheck } from '../db.server'
 
 // KTD5: exercise editable field scope. `_id` fields are never editable, and
 // technical fields (exercise_type_id, default_rest_time, default_graph_id,

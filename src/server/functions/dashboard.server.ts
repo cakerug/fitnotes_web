@@ -1,5 +1,6 @@
 import fs from 'node:fs'
-import { WORKING_DB_PATH, getWorkingDb, readEntityCounts, workingDbExists, type EntityCounts } from '../db.server'
+import { WORKING_DB_PATH, getWorkingDb, readEntityCounts, workingDbExists } from '../db.server'
+import type { EntityCounts } from '../db.server'
 
 export type DashboardSummary =
   | { status: 'empty' }

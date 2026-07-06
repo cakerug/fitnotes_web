@@ -1,4 +1,5 @@
-import { CATEGORY_REFERENCE_QUERIES, findReferences, getWorkingDb, type ReferenceCheck } from '../db.server'
+import { CATEGORY_REFERENCE_QUERIES, findReferences, getWorkingDb } from '../db.server'
+import type { ReferenceCheck } from '../db.server'
 
 export type CategoryDTO = {
   id: number

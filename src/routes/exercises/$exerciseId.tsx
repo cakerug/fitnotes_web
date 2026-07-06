@@ -32,7 +32,7 @@ function ExerciseEditPage() {
     setError(null)
     const input = {
       name,
-      categoryId: categoryId!,
+      categoryId: categoryId,
       notes: notes || null,
       weightIncrement: weightIncrement ? Number(weightIncrement) : null,
     }
@@ -80,7 +80,7 @@ function ExerciseEditPage() {
         <label className="block">
           <span className="text-sm font-medium text-gray-700">Notes</span>
           <textarea
-            value={notes ?? ''}
+            value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
             rows={3}

@@ -3,10 +3,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { vi } from 'vitest'
 import { buildSampleBackupBytes } from './fixtures/sampleBackup'
+import type * as DbServer from './db.server'
 
 export type TestDbContext = {
   testDataDir: string
-  dbModule: typeof import('./db.server')
+  dbModule: typeof DbServer
 }
 
 /**

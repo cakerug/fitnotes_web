@@ -1,12 +1,17 @@
 import fs from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { setupTestWorkingDb, teardownTestWorkingDb, type TestDbContext } from '../testSupport'
+import { setupTestWorkingDb, teardownTestWorkingDb } from '../testSupport'
+import type { TestDbContext } from '../testSupport'
+import type * as DiffServer from './diff.server'
+import type * as CategoriesServer from './categories.server'
+import type * as ExercisesServer from './exercises.server'
+import type * as RoutinesServer from './routines.server'
 
 let ctx: TestDbContext
-let getExportDiffSummary: typeof import('./diff.server').getExportDiffSummary
-let categoriesServer: typeof import('./categories.server')
-let exercisesServer: typeof import('./exercises.server')
-let routinesServer: typeof import('./routines.server')
+let getExportDiffSummary: typeof DiffServer.getExportDiffSummary
+let categoriesServer: typeof CategoriesServer
+let exercisesServer: typeof ExercisesServer
+let routinesServer: typeof RoutinesServer
 
 beforeEach(async () => {
   ctx = await setupTestWorkingDb()

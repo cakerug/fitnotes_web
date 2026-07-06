@@ -4,12 +4,14 @@ import path from 'node:path'
 import os from 'node:os'
 import Database from 'better-sqlite3'
 import { buildSampleBackupBytes } from '../fixtures/sampleBackup'
+import type * as ImportServer from './import.server'
+import type * as DbServer from '../db.server'
 
 // Point DATA_DIR at a throwaway temp directory before importing the module
 // under test, so these tests never touch a real working DB (see db.server.ts).
 let testDataDir: string
-let importBackup: typeof import('./import.server').importBackup
-let dbPaths: typeof import('../db.server')
+let importBackup: typeof ImportServer.importBackup
+let dbPaths: typeof DbServer
 
 beforeEach(async () => {
   testDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitnotes-import-test-'))
