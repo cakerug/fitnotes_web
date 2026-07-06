@@ -12,7 +12,8 @@ export const DATA_DIR = process.env.FITNOTES_DATA_DIR
 export const WORKING_DB_PATH = path.join(DATA_DIR, 'working.fitnotes')
 export const ORIGINAL_IMPORT_DB_PATH = path.join(DATA_DIR, 'original-import.fitnotes')
 
-// Schema grounding: FitNotes_Backup_2024-05-29.fitnotes (SQLite 3.x, user_version 22, schema version 4).
+// Schema grounding: a real FitNotes export (SQLite 3.x, user_version 22, schema version 4).
+// See fixtures/fitnotes-schema.sql for the structure-only schema dump used in tests.
 export const EXPECTED_USER_VERSION = 22
 export const CORE_TABLES = ['exercise', 'Category', 'Routine'] as const
 

@@ -41,19 +41,20 @@ describe('category CRUD', () => {
   })
 
   it('edge case: deleting a category with exercises still assigned is blocked (KTD4)', () => {
-    const categories = categoriesServer.listCategories()
-    // "Shoulders" (category 1 in the sample backup) has multiple exercises assigned.
-    const shoulders = categories.find((c) => c.name === 'Shoulders')
-    expect(shoulders).toBeDefined()
+    const db = ctx.dbModule.getWorkingDb()
+    const referenced = db.prepare('SELECT DISTINCT category_id FROM exercise LIMIT 1').get() as
+      | { category_id: number }
+      | undefined
+    expect(referenced).toBeDefined()
 
-    const result = categoriesServer.deleteCategory(shoulders!.id)
+    const result = categoriesServer.deleteCategory(referenced!.category_id)
 
     expect(result.status).toBe('blocked')
     if (result.status !== 'blocked') throw new Error('unreachable')
     expect(result.references.some((r) => r.label === 'exercises' && r.count > 0)).toBe(true)
 
     // Blocked delete must not have removed the category.
-    expect(categoriesServer.listCategories().some((c) => c.id === shoulders!.id)).toBe(true)
+    expect(categoriesServer.listCategories().some((c) => c.id === referenced!.category_id)).toBe(true)
   })
 
   it('edge case: rejects an empty category name', () => {

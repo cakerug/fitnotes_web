@@ -3,14 +3,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import Database from 'better-sqlite3'
+import { buildSampleBackupBytes } from '../fixtures/sampleBackup'
 
 // Point DATA_DIR at a throwaway temp directory before importing the module
 // under test, so these tests never touch a real working DB (see db.server.ts).
 let testDataDir: string
 let importBackup: typeof import('./import.server').importBackup
 let dbPaths: typeof import('../db.server')
-
-const REAL_BACKUP_PATH = path.resolve(process.cwd(), 'FitNotes_Backup_2024-05-29.fitnotes')
 
 beforeEach(async () => {
   testDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitnotes-import-test-'))
@@ -44,8 +43,8 @@ function buildMinimalValidBackup(overrides?: { userVersion?: number; omitTable?:
 }
 
 describe('importBackup', () => {
-  it('happy path: imports the real sample backup and reports counts', () => {
-    const bytes = fs.readFileSync(REAL_BACKUP_PATH)
+  it('happy path: imports the sample backup fixture and reports counts', () => {
+    const bytes = buildSampleBackupBytes()
     const result = importBackup(bytes, false)
 
     expect(result.status).toBe('success')
@@ -57,7 +56,7 @@ describe('importBackup', () => {
   })
 
   it('happy path: sets WAL journal mode on the working DB immediately (KTD1)', () => {
-    const bytes = fs.readFileSync(REAL_BACKUP_PATH)
+    const bytes = buildSampleBackupBytes()
     importBackup(bytes, false)
 
     const db = new Database(dbPaths.WORKING_DB_PATH, { readonly: true })
@@ -120,7 +119,7 @@ describe('importBackup', () => {
   })
 
   it('integration: the original-import copy is byte-identical to the uploaded file', () => {
-    const bytes = fs.readFileSync(REAL_BACKUP_PATH)
+    const bytes = buildSampleBackupBytes()
     importBackup(bytes, false)
 
     const originalCopyBytes = fs.readFileSync(dbPaths.ORIGINAL_IMPORT_DB_PATH)
