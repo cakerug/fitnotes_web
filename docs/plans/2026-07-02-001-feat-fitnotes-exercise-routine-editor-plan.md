@@ -258,9 +258,11 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 
 ## Open Questions
 
-**Deferred to Implementation:**
-- Exact copy for the delete-guard error message (KTD4) and the re-import confirmation warning (U2) — both are user-judgment UI-copy decisions, not architectural ones; write them when building U2/U3.
-- Whether the exported SQLite file needs to exactly match FitNotes' schema/pragma expectations (`user_version`, schema version, table set) for the Android app's restore feature to accept it. The in-place working-DB approach (KTD1), the schema-version guard, and U5's pre-export integrity/row-count checks make this likely but not certain, since the working DB is a copy of a real backup rather than a synthesized one and none of those checks can see how Android's restore code itself parses the file. Verify by actually restoring an exported file into the Android app before relying on this tool for real edits — if restore fails, revisit KTD1.
+**Resolved during implementation:**
+- Exact copy for the delete-guard error message (KTD4) and the re-import confirmation warning (U2) — both written during U2/U3. See the blocked-delete messages in `exercises.tsx`/`categories.tsx`/`routines/$routineId.tsx` and the re-import confirmation banner in `import.tsx`.
+
+**Still open:**
+- Whether the exported SQLite file needs to exactly match FitNotes' schema/pragma expectations (`user_version`, schema version, table set) for the Android app's restore feature to accept it. The in-place working-DB approach (KTD1), the schema-version guard, and U5's pre-export integrity/row-count checks make this likely but not certain, since the working DB is a copy of a real backup rather than a synthesized one and none of those checks can see how Android's restore code itself parses the file. Verify by actually restoring an exported file into the Android app before relying on this tool for real edits — if restore fails, revisit KTD1. **This is the one remaining item — only verifiable on your device, per the Goal Capsule's "Tail ownership" note.**
 
 ---
 
