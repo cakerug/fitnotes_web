@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { deleteExerciseFn, listExercisesFn } from '../../server/functions/exercises'
+import { deleteExerciseFn, listExerciseLogStatsFn, listExercisesFn } from '../../server/functions/exercises'
 import { createCategoryFn, deleteCategoryFn, listCategoriesFn, updateCategoryFn } from '../../server/functions/categories'
 import type { CategoryDTO } from '../../server/functions/categories.server'
-import type { ExerciseDTO } from '../../server/functions/exercises.server'
+import type { ExerciseDTO, ExerciseLogStatsDTO } from '../../server/functions/exercises.server'
 
 type ExerciseSearch = { category?: number }
 
@@ -13,8 +13,12 @@ export const Route = createFileRoute('/exercises/')({
     category: search.category === undefined ? undefined : Number(search.category),
   }),
   loader: async () => {
-    const [exercises, categories] = await Promise.all([listExercisesFn({ data: undefined }), listCategoriesFn()])
-    return { exercises, categories }
+    const [exercises, categories, logStats] = await Promise.all([
+      listExercisesFn({ data: undefined }),
+      listCategoriesFn(),
+      listExerciseLogStatsFn(),
+    ])
+    return { exercises, categories, logStats }
   },
   component: ExerciseListPage,
 })
@@ -23,10 +27,21 @@ function closeMenu(e: React.MouseEvent<HTMLButtonElement>) {
   e.currentTarget.closest('details')?.removeAttribute('open')
 }
 
+function formatLoggedStats(stats: ExerciseLogStatsDTO | undefined): string {
+  if (!stats || !stats.lastLoggedDate) return 'Never logged'
+  const lastLogged = new Date(`${stats.lastLoggedDate}T00:00:00`).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+  const times = stats.loggedCount === 1 ? '1 time' : `${stats.loggedCount} times`
+  return `Logged ${times} · last ${lastLogged}`
+}
+
 function ExerciseListPage() {
   const router = useRouter()
   const navigate = useNavigate({ from: Route.fullPath })
-  const { exercises, categories } = Route.useLoaderData()
+  const { exercises, categories, logStats } = Route.useLoaderData()
   const { category: selectedCategoryId } = Route.useSearch()
   const deleteExercise = useServerFn(deleteExerciseFn)
   const createCategory = useServerFn(createCategoryFn)
@@ -46,6 +61,8 @@ function ExerciseListPage() {
     }
     return counts
   }, [exercises])
+
+  const logStatsByExerciseId = useMemo(() => new Map(logStats.map((s) => [s.exerciseId, s])), [logStats])
 
   const matchesSearch = (exercise: ExerciseDTO) => exercise.name.toLowerCase().includes(search.toLowerCase())
 
@@ -230,13 +247,28 @@ function ExerciseListPage() {
                       >
                         {exercise.name}
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteExercise(exercise.id, exercise.name)}
-                        className="text-sm text-red-600"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">
+                          {formatLoggedStats(logStatsByExerciseId.get(exercise.id))}
+                        </span>
+                        <details className="relative">
+                          <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+                            •••
+                          </summary>
+                          <div className="absolute right-0 z-10 mt-1 w-32 rounded border border-gray-200 bg-white shadow-md">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                closeMenu(e)
+                                handleDeleteExercise(exercise.id, exercise.name)
+                              }}
+                              className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </details>
+                      </div>
                     </li>
                   ))}
                   {categoryExercises.length === 0 && (

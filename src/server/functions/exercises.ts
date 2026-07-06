@@ -3,6 +3,7 @@ import {
   createExercise,
   deleteExercise,
   getExercise,
+  listExerciseLogStats,
   listExercises,
   updateExercise,
   type ExerciseInput,
@@ -11,6 +12,8 @@ import {
 export const listExercisesFn = createServerFn({ method: 'GET' })
   .validator((data: { search?: string; categoryId?: number } | undefined) => data)
   .handler(async ({ data }) => listExercises(data))
+
+export const listExerciseLogStatsFn = createServerFn({ method: 'GET' }).handler(async () => listExerciseLogStats())
 
 export const getExerciseFn = createServerFn({ method: 'GET' })
   .validator((data: { id: number }) => data)

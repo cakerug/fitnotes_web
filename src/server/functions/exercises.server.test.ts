@@ -94,6 +94,31 @@ describe('exercise CRUD', () => {
     expect(exercisesServer.listExercises({ categoryId: categoryB.id }).some((e) => e.id === created.id)).toBe(true)
   })
 
+  it('happy path: listExerciseLogStats aggregates count and last logged date per exercise', () => {
+    const db = ctx.dbModule.getWorkingDb()
+    const referenced = db.prepare('SELECT DISTINCT exercise_id FROM training_log LIMIT 1').get() as
+      | { exercise_id: number }
+      | undefined
+    expect(referenced).toBeDefined()
+
+    const expected = db
+      .prepare('SELECT COUNT(*) AS c, MAX(date) AS d FROM training_log WHERE exercise_id = ?')
+      .get(referenced!.exercise_id) as { c: number; d: string }
+
+    const stats = exercisesServer.listExerciseLogStats().find((s) => s.exerciseId === referenced!.exercise_id)
+    expect(stats).toBeDefined()
+    expect(stats!.loggedCount).toBe(expected.c)
+    expect(stats!.lastLoggedDate).toBe(expected.d)
+  })
+
+  it('edge case: an exercise with no training-log entries has no stats row', () => {
+    const categories = categoriesServer.listCategories()
+    const created = exercisesServer.createExercise({ name: 'Never Logged', categoryId: categories[0].id })
+
+    const stats = exercisesServer.listExerciseLogStats().find((s) => s.exerciseId === created.id)
+    expect(stats).toBeUndefined()
+  })
+
   it('integration: importing then editing leaves the original-import baseline byte-identical (KTD9)', async () => {
     const fs = await import('node:fs')
     const before = fs.readFileSync(ctx.dbModule.ORIGINAL_IMPORT_DB_PATH)

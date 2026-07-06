@@ -117,6 +117,23 @@ export function updateExercise(input: ExerciseInput & { id: number }): ExerciseD
   return getExercise(input.id)
 }
 
+export type ExerciseLogStatsDTO = { exerciseId: number; loggedCount: number; lastLoggedDate: string | null }
+
+/** `date` is stored as ISO text (YYYY-MM-DD), so MAX() sorts it correctly as a string. */
+export function listExerciseLogStats(): Array<ExerciseLogStatsDTO> {
+  const db = getWorkingDb()
+  const rows = db
+    .prepare(
+      'SELECT exercise_id, COUNT(*) AS logged_count, MAX(date) AS last_logged_date FROM training_log GROUP BY exercise_id',
+    )
+    .all() as Array<{ exercise_id: number; logged_count: number; last_logged_date: string | null }>
+  return rows.map((r) => ({
+    exerciseId: r.exercise_id,
+    loggedCount: r.logged_count,
+    lastLoggedDate: r.last_logged_date,
+  }))
+}
+
 /** KTD4 + KTD8: check-then-delete against the full pinned reference list, in one transaction. */
 export function deleteExercise(id: number): DeleteResult {
   const db = getWorkingDb()
