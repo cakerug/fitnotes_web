@@ -3,18 +3,22 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { exportBackupFn } from '../server/functions/export'
 import { hasWorkingDbFn } from '../server/functions/dashboard'
+import { getExportDiffSummaryFn } from '../server/functions/diff'
+import type { EntityDiff } from '../server/functions/diff.server'
 
 export const Route = createFileRoute('/export')({
   loader: async () => {
     if (!(await hasWorkingDbFn())) {
       throw redirect({ to: '/' })
     }
+    return getExportDiffSummaryFn()
   },
   component: ExportPage,
 })
 
 function ExportPage() {
   const exportBackup = useServerFn(exportBackupFn)
+  const diffSummary = Route.useLoaderData()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +59,32 @@ function ExportPage() {
         every untouched table still matches its row count from import.
       </p>
 
+      {diffSummary.status === 'ready' && (
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold">Changes since import</h2>
+          {diffSummary.hasChanges ? (
+            <div className="mt-3 space-y-4 text-sm">
+              <DiffSection title="Categories" diff={diffSummary.categories} />
+              <DiffSection title="Exercises" diff={diffSummary.exercises} />
+              <DiffSection title="Routines" diff={diffSummary.routines} />
+              {(diffSummary.routineStructure.added > 0 ||
+                diffSummary.routineStructure.modified > 0 ||
+                diffSummary.routineStructure.removed > 0) && (
+                <div>
+                  <h3 className="font-medium text-gray-800">Routine structure (sections, exercises, sets)</h3>
+                  <p className="mt-1 text-gray-600">
+                    {diffSummary.routineStructure.added} added, {diffSummary.routineStructure.modified} modified,{' '}
+                    {diffSummary.routineStructure.removed} removed
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-600">No changes since import.</p>
+          )}
+        </div>
+      )}
+
       <button
         type="button"
         disabled={pending}
@@ -67,6 +97,21 @@ function ExportPage() {
       {error && (
         <div className="mt-6 rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">{error}</div>
       )}
+    </div>
+  )
+}
+
+function DiffSection({ title, diff }: { title: string; diff: EntityDiff }) {
+  if (diff.added.length === 0 && diff.removed.length === 0 && diff.modified.length === 0) return null
+
+  return (
+    <div>
+      <h3 className="font-medium text-gray-800">{title}</h3>
+      <ul className="mt-1 space-y-1 text-gray-600">
+        {diff.added.length > 0 && <li>Added: {diff.added.join(', ')}</li>}
+        {diff.modified.length > 0 && <li>Modified: {diff.modified.join(', ')}</li>}
+        {diff.removed.length > 0 && <li>Removed: {diff.removed.join(', ')}</li>}
+      </ul>
     </div>
   )
 }
