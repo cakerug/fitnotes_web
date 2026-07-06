@@ -11,7 +11,13 @@ body,
   min-height: 100%;
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
+  background-color: #ffffff;
+  color: #111827;
 }
 
