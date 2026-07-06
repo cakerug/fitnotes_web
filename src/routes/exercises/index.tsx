@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Link, createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { deleteExerciseFn, listExerciseLogStatsFn, listExercisesFn } from '../../server/functions/exercises'
 import { createCategoryFn, deleteCategoryFn, listCategoriesFn, updateCategoryFn } from '../../server/functions/categories'
+import { hasWorkingDbFn } from '../../server/functions/dashboard'
 import type { CategoryDTO } from '../../server/functions/categories.server'
 import type { ExerciseDTO, ExerciseLogStatsDTO } from '../../server/functions/exercises.server'
 
@@ -13,6 +14,9 @@ export const Route = createFileRoute('/exercises/')({
     category: search.category === undefined ? undefined : Number(search.category),
   }),
   loader: async () => {
+    if (!(await hasWorkingDbFn())) {
+      throw redirect({ to: '/' })
+    }
     const [exercises, categories, logStats] = await Promise.all([
       listExercisesFn({ data: undefined }),
       listCategoriesFn(),

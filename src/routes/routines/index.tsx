@@ -1,10 +1,16 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { createRoutineFn, deleteRoutineFn, listRoutinesFn } from '../../server/functions/routines'
+import { hasWorkingDbFn } from '../../server/functions/dashboard'
 
 export const Route = createFileRoute('/routines/')({
-  loader: () => listRoutinesFn(),
+  loader: async () => {
+    if (!(await hasWorkingDbFn())) {
+      throw redirect({ to: '/' })
+    }
+    return listRoutinesFn()
+  },
   component: RoutinesListPage,
 })
 

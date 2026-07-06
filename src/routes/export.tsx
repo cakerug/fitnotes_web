@@ -1,9 +1,17 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { exportBackupFn } from '../server/functions/export'
+import { hasWorkingDbFn } from '../server/functions/dashboard'
 
-export const Route = createFileRoute('/export')({ component: ExportPage })
+export const Route = createFileRoute('/export')({
+  loader: async () => {
+    if (!(await hasWorkingDbFn())) {
+      throw redirect({ to: '/' })
+    }
+  },
+  component: ExportPage,
+})
 
 function ExportPage() {
   const exportBackup = useServerFn(exportBackupFn)
