@@ -61,13 +61,3 @@ export function deleteCategory(id: number): DeleteResult {
   })
   return doDelete(id)
 }
-
-/** KTD6: persists a new manual order via sort_order, in one transaction. */
-export function reorderCategories(orderedIds: Array<number>): void {
-  const db = getWorkingDb()
-  const reorder = db.transaction((ids: Array<number>) => {
-    const stmt = db.prepare('UPDATE Category SET sort_order = ? WHERE _id = ?')
-    ids.forEach((id, index) => stmt.run(index, id))
-  })
-  reorder(orderedIds)
-}

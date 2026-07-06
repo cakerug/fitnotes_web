@@ -30,16 +30,6 @@ describe('category CRUD', () => {
     expect(remaining).toBeUndefined()
   })
 
-  it('happy path: reorder categories persists new sort_order (KTD6)', () => {
-    const before = categoriesServer.listCategories()
-    const reversedIds = [...before].reverse().map((c) => c.id)
-
-    categoriesServer.reorderCategories(reversedIds)
-
-    const after = categoriesServer.listCategories()
-    expect(after.map((c) => c.id)).toEqual(reversedIds)
-  })
-
   it('edge case: deleting a category with exercises still assigned is blocked (KTD4)', () => {
     const db = ctx.dbModule.getWorkingDb()
     const referenced = db.prepare('SELECT DISTINCT category_id FROM exercise LIMIT 1').get() as

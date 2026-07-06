@@ -1,11 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import {
-  createCategory,
-  deleteCategory,
-  listCategories,
-  reorderCategories,
-  updateCategory,
-} from './categories.server'
+import { createCategory, deleteCategory, listCategories, updateCategory } from './categories.server'
 
 export const listCategoriesFn = createServerFn({ method: 'GET' }).handler(async () => listCategories())
 
@@ -20,7 +14,3 @@ export const updateCategoryFn = createServerFn({ method: 'POST' })
 export const deleteCategoryFn = createServerFn({ method: 'POST' })
   .validator((data: { id: number }) => data)
   .handler(async ({ data }) => deleteCategory(data.id))
-
-export const reorderCategoriesFn = createServerFn({ method: 'POST' })
-  .validator((data: { orderedIds: Array<number> }) => data)
-  .handler(async ({ data }) => reorderCategories(data.orderedIds))
