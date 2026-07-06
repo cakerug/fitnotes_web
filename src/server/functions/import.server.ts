@@ -9,6 +9,7 @@ import {
   validateBackupFile,
   closeWorkingDb,
   getWorkingDb,
+  readEntityCounts,
 } from '../db.server'
 
 // Personal-use ceiling. TanStack Start server functions buffer the full
@@ -95,10 +96,7 @@ function describeValidationError(
 function readImportCounts() {
   const db = new Database(WORKING_DB_PATH, { readonly: true })
   try {
-    const exercises = (db.prepare('SELECT COUNT(*) AS c FROM exercise').get() as { c: number }).c
-    const categories = (db.prepare('SELECT COUNT(*) AS c FROM Category').get() as { c: number }).c
-    const routines = (db.prepare('SELECT COUNT(*) AS c FROM Routine').get() as { c: number }).c
-    return { exercises, categories, routines }
+    return readEntityCounts(db)
   } finally {
     db.close()
   }

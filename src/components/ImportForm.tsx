@@ -1,12 +1,9 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { importBackupFn } from '../server/functions/import'
 import type { ImportResult } from '../server/functions/import.server'
 
-export const Route = createFileRoute('/import')({ component: ImportPage })
-
-function ImportPage() {
+export function ImportForm({ onImported }: { onImported?: () => void }) {
   const importBackup = useServerFn(importBackupFn)
   const [file, setFile] = useState<File | null>(null)
   const [pending, setPending] = useState(false)
@@ -26,6 +23,7 @@ function ImportPage() {
         setNeedsConfirmation(true)
       } else {
         setResult(outcome)
+        if (outcome.status === 'success') onImported?.()
       }
     } finally {
       setPending(false)
@@ -33,13 +31,7 @@ function ImportPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl p-8">
-      <h1 className="text-2xl font-bold">Import FitNotes backup</h1>
-      <p className="mt-2 text-gray-600">
-        Choose a <code>.fitnotes</code> backup file exported from the Android app. This is a
-        one-time seed — it becomes this app&apos;s working copy of your exercises and routines.
-      </p>
-
+    <div>
       <div className="mt-6 flex items-center gap-3">
         <input
           type="file"

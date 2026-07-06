@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ImportRouteImport } from './routes/import'
 import { Route as ExportRouteImport } from './routes/export'
 import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,11 +17,6 @@ import { Route as ExercisesIndexRouteImport } from './routes/exercises/index'
 import { Route as RoutinesRoutineIdRouteImport } from './routes/routines/$routineId'
 import { Route as ExercisesExerciseIdRouteImport } from './routes/exercises/$exerciseId'
 
-const ImportRoute = ImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ExportRoute = ExportRouteImport.update({
   id: '/export',
   path: '/export',
@@ -63,7 +57,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
   '/export': typeof ExportRoute
-  '/import': typeof ImportRoute
   '/exercises/$exerciseId': typeof ExercisesExerciseIdRoute
   '/routines/$routineId': typeof RoutinesRoutineIdRoute
   '/exercises/': typeof ExercisesIndexRoute
@@ -73,7 +66,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
   '/export': typeof ExportRoute
-  '/import': typeof ImportRoute
   '/exercises/$exerciseId': typeof ExercisesExerciseIdRoute
   '/routines/$routineId': typeof RoutinesRoutineIdRoute
   '/exercises': typeof ExercisesIndexRoute
@@ -84,7 +76,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
   '/export': typeof ExportRoute
-  '/import': typeof ImportRoute
   '/exercises/$exerciseId': typeof ExercisesExerciseIdRoute
   '/routines/$routineId': typeof RoutinesRoutineIdRoute
   '/exercises/': typeof ExercisesIndexRoute
@@ -96,7 +87,6 @@ export interface FileRouteTypes {
     | '/'
     | '/categories'
     | '/export'
-    | '/import'
     | '/exercises/$exerciseId'
     | '/routines/$routineId'
     | '/exercises/'
@@ -106,7 +96,6 @@ export interface FileRouteTypes {
     | '/'
     | '/categories'
     | '/export'
-    | '/import'
     | '/exercises/$exerciseId'
     | '/routines/$routineId'
     | '/exercises'
@@ -116,7 +105,6 @@ export interface FileRouteTypes {
     | '/'
     | '/categories'
     | '/export'
-    | '/import'
     | '/exercises/$exerciseId'
     | '/routines/$routineId'
     | '/exercises/'
@@ -127,7 +115,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CategoriesRoute: typeof CategoriesRoute
   ExportRoute: typeof ExportRoute
-  ImportRoute: typeof ImportRoute
   ExercisesExerciseIdRoute: typeof ExercisesExerciseIdRoute
   RoutinesRoutineIdRoute: typeof RoutinesRoutineIdRoute
   ExercisesIndexRoute: typeof ExercisesIndexRoute
@@ -136,13 +123,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/import': {
-      id: '/import'
-      path: '/import'
-      fullPath: '/import'
-      preLoaderRoute: typeof ImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/export': {
       id: '/export'
       path: '/export'
@@ -199,7 +179,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CategoriesRoute: CategoriesRoute,
   ExportRoute: ExportRoute,
-  ImportRoute: ImportRoute,
   ExercisesExerciseIdRoute: ExercisesExerciseIdRoute,
   RoutinesRoutineIdRoute: RoutinesRoutineIdRoute,
   ExercisesIndexRoute: ExercisesIndexRoute,

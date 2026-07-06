@@ -169,7 +169,7 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 - **Files:**
   - `src/server/db.ts` (opens `data/working.fitnotes`, sets `PRAGMA journal_mode=WAL`)
   - `src/server/functions/import.ts` (server function accepting the uploaded file)
-  - `src/routes/import.tsx` (upload UI)
+  - `src/components/ImportForm.tsx` (upload UI; U6 later collapsed the standalone `/import` route into the landing page, so this is the sole surface for it)
 - **Approach:** A server function receives the uploaded file as `FormData` (per TanStack Start's documented server-function file-upload support), writes it to a temp path, and runs a lightweight size sanity check (Risks & Dependencies notes there's no framework-level upload limit). It opens the temp file with `better-sqlite3` to validate `PRAGMA user_version` against the known-good value and confirm the expected core tables (`exercise`, `Category`, `Routine`, at minimum) are present (KTD1), then atomically writes **two** copies into place: `data/working.fitnotes` (KTD1, edited going forward) and `data/original-import.fitnotes` (KTD9, read-only, never opened for writes). If a working database already exists, the UI requires explicit confirmation before re-import proceeds, since re-import discards any edits made since the last export (no merge — see Scope Boundaries).
 - **Test scenarios:**
   - Happy path: uploading the real sample backup succeeds and the working DB is queryable afterward with the expected exercise/category/routine counts.
@@ -236,6 +236,23 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
   - Edge case: export is blocked with a clear error if any passthrough table's row count differs from the KTD9 baseline captured at import.
 - **Verification:** Export the working DB after making edits in U3/U4, re-open the exported file, and confirm both acceptance examples and all three pre-export checks hold; manually restore the exported file into the real Android app at least once (see Open Questions) before treating this unit as fully done.
 
+### U6. Landing page / dashboard
+
+- **Goal:** Replace the placeholder `/` route with a real landing page: the import flow (U2) if no working DB exists yet, or a summary dashboard if one does.
+- **Requirements:** none new — this is a UX surface over data U2's import and U5's counts already produce; added post-hoc based on a user request for an at-a-glance way to check "is this still the backup I think it is" against the imported data rather than blindly trusting a re-import decision.
+- **Dependencies:** U2 (working DB existence, `readImportCounts`-style counts), KTD1/KTD9 (working vs. original-import file semantics).
+- **Files:**
+  - `src/routes/index.tsx` (replaces the TanStack Start placeholder)
+  - `src/server/functions/dashboard.server.ts` (new: summary read model)
+  - `src/server/functions/dashboard.ts` (server function wrapper)
+- **Approach:** `workingDbExists()` (already in `db.server.ts`) gates which view renders: if false, render the upload UI (extracted to `src/components/ImportForm.tsx`, shared rather than duplicated); if true, render a summary with (a) `data/working.fitnotes`'s filesystem mtime as "imported at" — cheap, no schema change, via `fs.statSync(WORKING_DB_PATH).mtime` — and (b) `SELECT MAX(date) FROM training_log` for "latest logged workout," since that's a more meaningful staleness signal than a raw file timestamp (tells you whether the backup actually contains recent workouts, not just when the file was touched). Also surface exercise/category/routine counts, reusing `readEntityCounts()` (extracted to `db.server.ts` from `import.server.ts`'s original inline version). No new edit surface, no changelog of in-app edits — the plan doc already documents that this app doesn't track edit history (see conversation record; still explicitly out of scope for v1). The standalone `/import` route was later removed entirely (collapsed into `/`, since a dedicated import page added no value once the landing page could show the same form plus a re-import affordance) — `ImportForm` is now the only upload surface, embedded directly on `/` for the empty state and behind a "Import a different backup" `<details>` disclosure otherwise.
+- **Test scenarios:**
+  - Happy path: with no working DB present, `/` renders the import UI and importing successfully transitions to the dashboard view (no separate navigation needed).
+  - Happy path: with a working DB present, `/` shows accurate exercise/category/routine counts and the correct `MAX(training_log.date)`.
+  - Edge case: a working DB with an empty `training_log` (e.g. freshly imported with no logged workouts) shows a clear "no workouts logged yet" state rather than a null/blank date.
+  - Edge case: re-importing from this page follows the same confirmation flow as `/import` (KTD1/U2) — no bypass just because the entry point changed.
+- **Verification:** Fresh `data/` directory (no working DB) shows the import UI at `/`; importing the sample backup transitions to the dashboard showing its real counts and latest training-log date.
+
 ---
 
 ## Verification Contract
@@ -260,7 +277,7 @@ Passthrough tables (`training_log`, `BodyWeight`, `Goal`, `Measurement`, `settin
 ## Open Questions
 
 **Resolved during implementation:**
-- Exact copy for the delete-guard error message (KTD4) and the re-import confirmation warning (U2) — both written during U2/U3. See the blocked-delete messages in `exercises.tsx`/`categories.tsx`/`routines/$routineId.tsx` and the re-import confirmation banner in `import.tsx`.
+- Exact copy for the delete-guard error message (KTD4) and the re-import confirmation warning (U2) — both written during U2/U3. See the blocked-delete messages in `exercises.tsx`/`categories.tsx`/`routines/$routineId.tsx` and the re-import confirmation banner in `ImportForm.tsx` (U6 moved this out of the now-removed `import.tsx` route).
 
 **Still open:**
 - Whether the exported SQLite file needs to exactly match FitNotes' schema/pragma expectations (`user_version`, schema version, table set) for the Android app's restore feature to accept it. The in-place working-DB approach (KTD1), the schema-version guard, and U5's pre-export integrity/row-count checks make this likely but not certain, since the working DB is a copy of a real backup rather than a synthesized one and none of those checks can see how Android's restore code itself parses the file. Verify by actually restoring an exported file into the Android app before relying on this tool for real edits — if restore fails, revisit KTD1. **This is the one remaining item — only verifiable on your device, per the Goal Capsule's "Tail ownership" note.**

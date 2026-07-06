@@ -151,3 +151,13 @@ export function integrityCheck(filePath: string): boolean {
     db.close()
   }
 }
+
+export type EntityCounts = { exercises: number; categories: number; routines: number }
+
+/** Shared by U2's post-import summary and U6's dashboard — same counts, two call sites. */
+export function readEntityCounts(db: Database.Database): EntityCounts {
+  const exercises = (db.prepare('SELECT COUNT(*) AS c FROM exercise').get() as { c: number }).c
+  const categories = (db.prepare('SELECT COUNT(*) AS c FROM Category').get() as { c: number }).c
+  const routines = (db.prepare('SELECT COUNT(*) AS c FROM Routine').get() as { c: number }).c
+  return { exercises, categories, routines }
+}

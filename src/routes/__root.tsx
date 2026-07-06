@@ -39,9 +39,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Link to="/" className="[&.active]:font-bold">
             Home
           </Link>
-          <Link to="/import" className="[&.active]:font-bold">
-            Import
-          </Link>
           <Link to="/exercises" className="[&.active]:font-bold">
             Exercises
           </Link>
