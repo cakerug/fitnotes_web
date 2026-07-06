@@ -40,7 +40,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             Home
           </Link>
           <Link to="/exercises" className="[&.active]:font-bold">
-            Exercises
+            All Exercises
           </Link>
           <Link to="/categories" className="[&.active]:font-bold">
             Categories
