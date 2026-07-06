@@ -18,6 +18,10 @@ export const CORE_TABLES = ['exercise', 'Category', 'Routine'] as const
 
 // KTD4: exhaustive, pinned reference list for the delete guard. Tables/columns
 // that reference exercise._id or Category._id, verified against the sample schema.
+// The imported FitNotes schema doesn't declare real FK constraints on these
+// columns, so SQLite won't block or cascade a delete on its own — without this
+// app-level check, deleting a referenced row would silently orphan the
+// referencing rows (e.g. training_log entries pointing at a deleted exercise).
 export const CATEGORY_REFERENCE_QUERIES = [
   { label: 'exercises', sql: 'SELECT COUNT(*) AS c FROM exercise WHERE category_id = ?' },
 ] as const
