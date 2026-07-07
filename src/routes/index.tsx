@@ -35,7 +35,7 @@ function Home() {
           <dt className="text-gray-500">Latest logged workout</dt>
           <dd>
             {summary.latestWorkoutDate
-              ? new Date(summary.latestWorkoutDate).toLocaleDateString()
+              ? new Date(`${summary.latestWorkoutDate}T00:00:00`).toLocaleDateString()
               : 'No workouts logged yet'}
           </dd>
         </div>
