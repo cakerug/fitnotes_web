@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
   addExerciseToSectionFn,
@@ -40,7 +40,13 @@ function RoutineDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-8">
-      <RoutineHeader routine={routine} onSaved={refresh} />
+      <Link to="/routines" className="text-sm text-blue-600">
+        ← Back
+      </Link>
+
+      <div className="mt-4">
+        <RoutineHeader routine={routine} onSaved={refresh} />
+      </div>
 
       <div className="mt-8 space-y-6">
         {routine.sections.map((section, index) => (
