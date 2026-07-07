@@ -88,6 +88,21 @@ describe('getExportDiffSummary', () => {
     expect(summary.routineStructure.removed).toBe(0)
   })
 
+  it('rolls a new superset and its membership into routineStructure counts', () => {
+    const routine = routinesServer.createRoutine({ name: 'Superset Diff Routine' })
+    const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })
+    const exercise = exercisesServer.listExercises()[0]
+    const sectionExercise = routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: exercise.id })
+    const superset = routinesServer.createSuperset({ sectionId: section.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercise.id, supersetId: superset.id })
+
+    const summary = getExportDiffSummary()
+    expect(summary.status).toBe('ready')
+    if (summary.status !== 'ready') throw new Error('unreachable')
+    // 1 section + 1 section exercise + 1 WorkoutGroup + 1 WorkoutGroupExercise
+    expect(summary.routineStructure.added).toBe(4)
+  })
+
   it('is unavailable when there is no working DB', () => {
     ctx.dbModule.closeWorkingDb()
     fs.rmSync(ctx.dbModule.WORKING_DB_PATH, { force: true })

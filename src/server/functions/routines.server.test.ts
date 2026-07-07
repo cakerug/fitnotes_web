@@ -93,7 +93,7 @@ describe('routine CRUD', () => {
     expect(routinesServer.getRoutine(routine.id).sections[0].exercises).toEqual([])
   })
 
-  it('edge case: deleting a routine section referenced by a WorkoutGroup is blocked (KTD4)', () => {
+  it('edge case: deleting a routine section cascades through its WorkoutGroup/WorkoutGroupExercise rows', () => {
     const db = ctx.dbModule.getWorkingDb()
     // routine_section_id = 0 is FitNotes' sentinel for "no section", not a real
     // reference — join against RoutineSection to find an actual live reference.
@@ -105,17 +105,18 @@ describe('routine CRUD', () => {
       )
       .get() as { routine_section_id: number } | undefined
     expect(referenced).toBeDefined()
+    const sectionId = referenced!.routine_section_id
 
-    const result = routinesServer.deleteSection(referenced!.routine_section_id)
+    routinesServer.deleteSection(sectionId)
 
-    expect(result.status).toBe('blocked')
-    if (result.status !== 'blocked') throw new Error('unreachable')
-    expect(result.references.some((r) => r.label === 'workout groups')).toBe(true)
-
-    const stillExists = db
-      .prepare('SELECT COUNT(*) AS c FROM RoutineSection WHERE _id = ?')
-      .get(referenced!.routine_section_id) as { c: number }
-    expect(stillExists.c).toBe(1)
+    const stillExists = db.prepare('SELECT COUNT(*) AS c FROM RoutineSection WHERE _id = ?').get(sectionId) as {
+      c: number
+    }
+    expect(stillExists.c).toBe(0)
+    const remainingGroups = db
+      .prepare('SELECT COUNT(*) AS c FROM WorkoutGroup WHERE routine_section_id = ?')
+      .get(sectionId) as { c: number }
+    expect(remainingGroups.c).toBe(0)
   })
 
   it('integration: adding a target set correctly joins RoutineSectionExercise and RoutineSectionExerciseSet', () => {
@@ -163,5 +164,104 @@ describe('routine CRUD', () => {
     const exerciseCountAfter = (db.prepare('SELECT COUNT(*) AS c FROM RoutineSectionExercise').get() as { c: number }).c
     expect(setCountAfter).toBe(setCountBefore)
     expect(exerciseCountAfter).toBe(exerciseCountBefore)
+  })
+})
+
+describe('supersets', () => {
+  function setUpSectionWithExercises(count: number) {
+    const routine = routinesServer.createRoutine({ name: 'Superset Test' })
+    const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })
+    const exercises = exercisesServer.listExercises().slice(0, count)
+    const sectionExercises = exercises.map((e) =>
+      routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: e.id }),
+    )
+    return { routine, section, sectionExercises }
+  }
+
+  it('happy path: creating a superset auto-names and auto-colours it by creation order', () => {
+    const { section } = setUpSectionWithExercises(1)
+
+    const first = routinesServer.createSuperset({ sectionId: section.id })
+    const second = routinesServer.createSuperset({ sectionId: section.id })
+    const named = routinesServer.createSuperset({ sectionId: section.id, name: 'My Superset' })
+
+    expect(first.name).toBe('Superset 1')
+    expect(second.name).toBe('Superset 2')
+    expect(named.name).toBe('My Superset')
+    expect(first.colour).not.toBe(second.colour)
+  })
+
+  it('happy path: adding an exercise to a superset surfaces it on the exercise and section DTOs', () => {
+    const { routine, section, sectionExercises } = setUpSectionWithExercises(2)
+    const superset = routinesServer.createSuperset({ sectionId: section.id, name: 'Push' })
+
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: superset.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[1].id, supersetId: superset.id })
+
+    const full = routinesServer.getRoutine(routine.id)
+    expect(full.sections[0].supersets).toEqual([{ id: superset.id, name: 'Push', colour: superset.colour }])
+    expect(full.sections[0].exercises.map((e) => e.supersetId)).toEqual([superset.id, superset.id])
+  })
+
+  it('edge case: moving an exercise to a new superset replaces its prior membership', () => {
+    const { section, sectionExercises } = setUpSectionWithExercises(1)
+    const first = routinesServer.createSuperset({ sectionId: section.id })
+    const second = routinesServer.createSuperset({ sectionId: section.id })
+
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: first.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: second.id })
+
+    const db = ctx.dbModule.getWorkingDb()
+    const membershipCount = (
+      db.prepare('SELECT COUNT(*) AS c FROM WorkoutGroupExercise WHERE routine_section_id = ?').get(section.id) as {
+        c: number
+      }
+    ).c
+    expect(membershipCount).toBe(1)
+  })
+
+  it('happy path: removing an exercise from its superset ungroups it without touching other members', () => {
+    const { routine, section, sectionExercises } = setUpSectionWithExercises(2)
+    const superset = routinesServer.createSuperset({ sectionId: section.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: superset.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[1].id, supersetId: superset.id })
+
+    routinesServer.removeExerciseFromSuperset(sectionExercises[0].id)
+
+    const full = routinesServer.getRoutine(routine.id)
+    const target = full.sections[0].exercises.find((e) => e.id === sectionExercises[0].id)
+    const other = full.sections[0].exercises.find((e) => e.id === sectionExercises[1].id)
+    expect(target?.supersetId).toBeNull()
+    expect(other?.supersetId).toBe(superset.id)
+  })
+
+  it("happy path: deleting a superset ungroups its exercises but doesn't remove them from the routine", () => {
+    const { routine, section, sectionExercises } = setUpSectionWithExercises(2)
+    const superset = routinesServer.createSuperset({ sectionId: section.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: superset.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[1].id, supersetId: superset.id })
+
+    routinesServer.deleteSuperset(superset.id)
+
+    const full = routinesServer.getRoutine(routine.id)
+    expect(full.sections[0].supersets).toEqual([])
+    expect(full.sections[0].exercises).toHaveLength(2)
+    expect(full.sections[0].exercises.every((e) => e.supersetId === null)).toBe(true)
+  })
+
+  it('edge case: removing an exercise from its section also drops its superset membership', () => {
+    const { section, sectionExercises } = setUpSectionWithExercises(2)
+    const superset = routinesServer.createSuperset({ sectionId: section.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercises[0].id, supersetId: superset.id })
+
+    routinesServer.removeExerciseFromSection(sectionExercises[0].id)
+
+    const db = ctx.dbModule.getWorkingDb()
+    const orphanedMembership = (
+      db.prepare('SELECT COUNT(*) AS c FROM WorkoutGroupExercise WHERE routine_section_id = ?').get(section.id) as {
+        c: number
+      }
+    ).c
+    expect(orphanedMembership).toBe(0)
   })
 })

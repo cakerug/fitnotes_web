@@ -1,5 +1,4 @@
-import { ROUTINE_SECTION_REFERENCE_QUERIES, findReferences, getWorkingDb } from '../db.server'
-import type { ReferenceCheck } from '../db.server'
+import { getWorkingDb } from '../db.server'
 
 export type SetDTO = {
   id: number
@@ -16,7 +15,14 @@ export type SectionExerciseDTO = {
   exerciseId: number
   exerciseName: string
   sortOrder: number
+  supersetId: number | null
   sets: Array<SetDTO>
+}
+
+export type SupersetDTO = {
+  id: number
+  name: string
+  colour: number
 }
 
 export type SectionDTO = {
@@ -24,6 +30,7 @@ export type SectionDTO = {
   name: string
   sortOrder: number
   exercises: Array<SectionExerciseDTO>
+  supersets: Array<SupersetDTO>
 }
 
 export type RoutineDTO = {
@@ -40,10 +47,20 @@ export type RoutineSummaryDTO = {
   sectionCount: number
 }
 
-export type DeleteResult = { status: 'success' } | { status: 'blocked'; references: Array<ReferenceCheck> }
-
 /** FitNotes' populate_sets_type enum is undocumented; 2 = "Copy previous workout" (inferred from backup data — see plan doc). */
 const POPULATE_SETS_TYPE_COPY_PREVIOUS_WORKOUT = 2
+
+// A routine-template superset's WorkoutGroup/WorkoutGroupExercise rows always
+// carry an empty date — a non-empty date marks a one-off grouping made while
+// logging a specific workout on that date, which this app doesn't manage.
+const TEMPLATE_DATE = ''
+
+// FitNotes cycles a section's supersets through this fixed 5-colour set
+// (Android's old Holo accent palette: red, purple, blue, green, orange, in
+// this order) — confirmed against every distinct WorkoutGroup.colour value
+// already in use across a real backup's supersets. Wraps around past 5
+// supersets in one section.
+const SUPERSET_COLOURS = [-48060, -5609780, -13388315, -6697984, -17613] as const
 
 export function listRoutines(): Array<RoutineSummaryDTO> {
   const db = getWorkingDb()
@@ -85,6 +102,22 @@ export function getRoutine(id: number): RoutineDTO {
       exercise_name: string
     }>
 
+    // WorkoutGroupExercise links a superset to an exercise_id, not a
+    // RoutineSectionExercise row — fine as long as a section never has the
+    // same exercise added twice, which the "add exercise" UI already prevents
+    // implicitly (see plan doc).
+    const supersetIdByExerciseId = new Map(
+      (
+        db
+          .prepare('SELECT exercise_id, workout_group_id FROM WorkoutGroupExercise WHERE routine_section_id = ?')
+          .all(section._id) as Array<{ exercise_id: number; workout_group_id: number }>
+      ).map((m) => [m.exercise_id, m.workout_group_id]),
+    )
+
+    const supersets = db
+      .prepare('SELECT _id, name, colour FROM WorkoutGroup WHERE routine_section_id = ?')
+      .all(section._id) as Array<{ _id: number; name: string; colour: number }>
+
     const exerciseDTOs: Array<SectionExerciseDTO> = exercises.map((ex) => {
       const sets = db
         .prepare(
@@ -104,6 +137,7 @@ export function getRoutine(id: number): RoutineDTO {
         exerciseId: ex.exercise_id,
         exerciseName: ex.exercise_name,
         sortOrder: ex.sort_order,
+        supersetId: supersetIdByExerciseId.get(ex.exercise_id) ?? null,
         sets: sets.map((s) => ({
           id: s._id,
           metricWeight: s.metric_weight,
@@ -116,7 +150,13 @@ export function getRoutine(id: number): RoutineDTO {
       }
     })
 
-    return { id: section._id, name: section.name, sortOrder: section.sort_order, exercises: exerciseDTOs }
+    return {
+      id: section._id,
+      name: section.name,
+      sortOrder: section.sort_order,
+      exercises: exerciseDTOs,
+      supersets: supersets.map((g) => ({ id: g._id, name: g.name, colour: g.colour })),
+    }
   })
 
   return { id: routine._id, name: routine.name, notes: routine.notes, sections: sectionDTOs }
@@ -168,7 +208,7 @@ export function addSection(input: { routineId: number; name: string }): SectionD
   })
 
   const id = create()
-  return { id, name, sortOrder: 0, exercises: [] }
+  return { id, name, sortOrder: 0, exercises: [], supersets: [] }
 }
 
 export function renameSection(input: { id: number; name: string }): void {
@@ -178,21 +218,16 @@ export function renameSection(input: { id: number; name: string }): void {
   db.prepare('UPDATE RoutineSection SET name = ? WHERE _id = ?').run(name, input.id)
 }
 
-/** KTD4 + KTD8: routine sections are referenced by WorkoutGroup/WorkoutGroupExercise. */
-export function deleteSection(id: number): DeleteResult {
+/** Routine sections aren't referenced outside their own subtree — cascades straight through (KTD8). */
+export function deleteSection(id: number): void {
   const db = getWorkingDb()
-  const doDelete = db.transaction((sectionId: number): DeleteResult => {
-    const references = findReferences(db, ROUTINE_SECTION_REFERENCE_QUERIES, sectionId)
-    if (references.length > 0) {
-      return { status: 'blocked', references }
-    }
+  const doDelete = db.transaction((sectionId: number) => {
     deleteSectionCascadeInternal(db, sectionId)
-    return { status: 'success' }
   })
-  return doDelete(id)
+  doDelete(id)
 }
 
-/** Removes a section's exercises and their sets first. Caller must already be inside a transaction. */
+/** Removes a section's exercises, their sets, and any supersets first. Caller must already be inside a transaction. */
 function deleteSectionCascadeInternal(db: ReturnType<typeof getWorkingDb>, sectionId: number): void {
   const exerciseIds = (
     db.prepare('SELECT _id FROM RoutineSectionExercise WHERE routine_section_id = ?').all(sectionId) as Array<{
@@ -202,6 +237,8 @@ function deleteSectionCascadeInternal(db: ReturnType<typeof getWorkingDb>, secti
   for (const exerciseRowId of exerciseIds) {
     db.prepare('DELETE FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ?').run(exerciseRowId)
   }
+  db.prepare('DELETE FROM WorkoutGroupExercise WHERE routine_section_id = ?').run(sectionId)
+  db.prepare('DELETE FROM WorkoutGroup WHERE routine_section_id = ?').run(sectionId)
   db.prepare('DELETE FROM RoutineSectionExercise WHERE routine_section_id = ?').run(sectionId)
   db.prepare('DELETE FROM RoutineSection WHERE _id = ?').run(sectionId)
 }
@@ -232,17 +269,89 @@ export function addExerciseToSection(input: { sectionId: number; exerciseId: num
 
   const id = create()
   const exercise = db.prepare('SELECT name FROM exercise WHERE _id = ?').get(input.exerciseId) as { name: string }
-  return { id, exerciseId: input.exerciseId, exerciseName: exercise.name, sortOrder: 0, sets: [] }
+  return { id, exerciseId: input.exerciseId, exerciseName: exercise.name, sortOrder: 0, supersetId: null, sets: [] }
 }
 
-/** KTD8: removing an exercise from a section must also remove its target sets. */
+/** KTD8: removing an exercise from a section must also remove its target sets and any superset membership. */
 export function removeExerciseFromSection(id: number): void {
   const db = getWorkingDb()
   const remove = db.transaction((sectionExerciseId: number) => {
+    const sectionExercise = db
+      .prepare('SELECT routine_section_id, exercise_id FROM RoutineSectionExercise WHERE _id = ?')
+      .get(sectionExerciseId) as { routine_section_id: number; exercise_id: number } | undefined
+    if (sectionExercise) {
+      db.prepare('DELETE FROM WorkoutGroupExercise WHERE routine_section_id = ? AND exercise_id = ?').run(
+        sectionExercise.routine_section_id,
+        sectionExercise.exercise_id,
+      )
+    }
     db.prepare('DELETE FROM RoutineSectionExerciseSet WHERE routine_section_exercise_id = ?').run(sectionExerciseId)
     db.prepare('DELETE FROM RoutineSectionExercise WHERE _id = ?').run(sectionExerciseId)
   })
   remove(id)
+}
+
+/** Auto-names/colours by creation order within the section: "Superset 1", "Superset 2", ... */
+export function createSuperset(input: { sectionId: number; name?: string }): SupersetDTO {
+  const db = getWorkingDb()
+  const create = db.transaction(() => {
+    const existingCount = (
+      db.prepare('SELECT COUNT(*) AS c FROM WorkoutGroup WHERE routine_section_id = ?').get(input.sectionId) as {
+        c: number
+      }
+    ).c
+    const ordinal = existingCount + 1
+    const name = input.name?.trim() || `Superset ${ordinal}`
+    const colour = SUPERSET_COLOURS[(ordinal - 1) % SUPERSET_COLOURS.length]
+    const result = db
+      .prepare('INSERT INTO WorkoutGroup (name, date, colour, routine_section_id) VALUES (?, ?, ?, ?)')
+      .run(name, TEMPLATE_DATE, colour, input.sectionId)
+    return { id: Number(result.lastInsertRowid), name, colour }
+  })
+  return create()
+}
+
+/** Moves a section exercise into a superset, replacing any prior membership — an exercise belongs to at most one. */
+export function addExerciseToSuperset(input: { sectionExerciseId: number; supersetId: number }): void {
+  const db = getWorkingDb()
+  const add = db.transaction(() => {
+    const sectionExercise = db
+      .prepare('SELECT routine_section_id, exercise_id FROM RoutineSectionExercise WHERE _id = ?')
+      .get(input.sectionExerciseId) as { routine_section_id: number; exercise_id: number } | undefined
+    if (!sectionExercise) throw new Error(`Section exercise ${input.sectionExerciseId} not found.`)
+
+    db.prepare('DELETE FROM WorkoutGroupExercise WHERE routine_section_id = ? AND exercise_id = ?').run(
+      sectionExercise.routine_section_id,
+      sectionExercise.exercise_id,
+    )
+    db.prepare(
+      'INSERT INTO WorkoutGroupExercise (exercise_id, date, routine_section_id, workout_group_id) VALUES (?, ?, ?, ?)',
+    ).run(sectionExercise.exercise_id, TEMPLATE_DATE, sectionExercise.routine_section_id, input.supersetId)
+  })
+  add()
+}
+
+/** Ungroups a single exercise — the superset and its other members are untouched. */
+export function removeExerciseFromSuperset(sectionExerciseId: number): void {
+  const db = getWorkingDb()
+  const sectionExercise = db
+    .prepare('SELECT routine_section_id, exercise_id FROM RoutineSectionExercise WHERE _id = ?')
+    .get(sectionExerciseId) as { routine_section_id: number; exercise_id: number } | undefined
+  if (!sectionExercise) return
+  db.prepare('DELETE FROM WorkoutGroupExercise WHERE routine_section_id = ? AND exercise_id = ?').run(
+    sectionExercise.routine_section_id,
+    sectionExercise.exercise_id,
+  )
+}
+
+/** Deletes the superset grouping itself — member exercises stay in the routine untouched. */
+export function deleteSuperset(id: number): void {
+  const db = getWorkingDb()
+  const doDelete = db.transaction((supersetId: number) => {
+    db.prepare('DELETE FROM WorkoutGroupExercise WHERE workout_group_id = ?').run(supersetId)
+    db.prepare('DELETE FROM WorkoutGroup WHERE _id = ?').run(supersetId)
+  })
+  doDelete(id)
 }
 
 export function reorderSectionExercises(input: { orderedIds: Array<number> }): void {

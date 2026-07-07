@@ -31,6 +31,22 @@ export const deleteSectionFn = createServerFn({ method: 'POST' })
   .validator((data: { id: number }) => data)
   .handler(async ({ data }) => routinesServer.deleteSection(data.id))
 
+export const createSupersetFn = createServerFn({ method: 'POST' })
+  .validator((data: { sectionId: number; name?: string }) => data)
+  .handler(async ({ data }) => routinesServer.createSuperset(data))
+
+export const addExerciseToSupersetFn = createServerFn({ method: 'POST' })
+  .validator((data: { sectionExerciseId: number; supersetId: number }) => data)
+  .handler(async ({ data }) => routinesServer.addExerciseToSuperset(data))
+
+export const removeExerciseFromSupersetFn = createServerFn({ method: 'POST' })
+  .validator((data: { sectionExerciseId: number }) => data)
+  .handler(async ({ data }) => routinesServer.removeExerciseFromSuperset(data.sectionExerciseId))
+
+export const deleteSupersetFn = createServerFn({ method: 'POST' })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => routinesServer.deleteSuperset(data.id))
+
 export const reorderSectionsFn = createServerFn({ method: 'POST' })
   .validator((data: { orderedIds: Array<number> }) => data)
   .handler(async ({ data }) => routinesServer.reorderSections(data))
