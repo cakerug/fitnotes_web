@@ -3,6 +3,12 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { createExerciseFn, getExerciseFn, updateExerciseFn } from '../../server/functions/exercises'
 import { listCategoriesFn } from '../../server/functions/categories'
+import {
+  DEFAULT_EXERCISE_TYPE_ID,
+  EXERCISE_TYPES,
+  describeTrackedFields,
+  getExerciseTypeLabel,
+} from '../../lib/exerciseTypes'
 
 export const Route = createFileRoute('/exercises/$exerciseId')({
   loader: async ({ params }) => {
@@ -26,7 +32,15 @@ function ExerciseEditPage() {
   const [categoryId, setCategoryId] = useState(exercise?.categoryId ?? categories[0]?.id)
   const [notes, setNotes] = useState(exercise?.notes ?? '')
   const [weightIncrement, setWeightIncrement] = useState(exercise?.weightIncrement?.toString() ?? '')
+  const [exerciseTypeId, setExerciseTypeId] = useState(exercise?.exerciseTypeId ?? DEFAULT_EXERCISE_TYPE_ID)
   const [error, setError] = useState<string | null>(null)
+
+  // Imported exercises can carry a type id this app doesn't recognize (see exerciseTypes.ts);
+  // add it as an extra option so the select shows the real current value instead of silently
+  // jumping to a different one.
+  const typeOptions = EXERCISE_TYPES.some((t) => t.id === exerciseTypeId)
+    ? EXERCISE_TYPES
+    : [...EXERCISE_TYPES, { id: exerciseTypeId, label: getExerciseTypeLabel(exerciseTypeId) }]
 
   async function handleSave() {
     setError(null)
@@ -35,6 +49,7 @@ function ExerciseEditPage() {
       categoryId: categoryId,
       notes: notes || null,
       weightIncrement: weightIncrement ? Number(weightIncrement) : null,
+      exerciseTypeId,
     }
     try {
       if (exercise) {
@@ -75,6 +90,22 @@ function ExerciseEditPage() {
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium text-gray-700">Type</span>
+          <select
+            value={exerciseTypeId}
+            onChange={(e) => setExerciseTypeId(Number(e.target.value))}
+            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          >
+            {typeOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-gray-500">Tracks: {describeTrackedFields(exerciseTypeId)}</span>
         </label>
 
         <label className="block">

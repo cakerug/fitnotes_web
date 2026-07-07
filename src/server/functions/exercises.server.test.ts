@@ -162,6 +162,46 @@ describe('exercise CRUD', () => {
     expect(exercisesServer.getExercise(newExercise.id).name).toBe('Never Logged 2')
   })
 
+  it('happy path: exerciseTypeId defaults to 0 on create and is editable via update', () => {
+    const categories = categoriesServer.listCategories()
+    const created = exercisesServer.createExercise({ name: 'Default Type', categoryId: categories[0].id })
+    expect(created.exerciseTypeId).toBe(0)
+
+    const updated = exercisesServer.updateExercise({
+      id: created.id,
+      name: created.name,
+      categoryId: created.categoryId,
+      exerciseTypeId: 7,
+    })
+    expect(updated.exerciseTypeId).toBe(7)
+  })
+
+  it('happy path: createExercise accepts an explicit exerciseTypeId', () => {
+    const categories = categoriesServer.listCategories()
+    const created = exercisesServer.createExercise({
+      name: 'Timed Plank',
+      categoryId: categories[0].id,
+      exerciseTypeId: 3,
+    })
+    expect(created.exerciseTypeId).toBe(3)
+  })
+
+  it('edge case: updateExercise without exerciseTypeId leaves the existing type untouched', () => {
+    const categories = categoriesServer.listCategories()
+    const created = exercisesServer.createExercise({
+      name: 'Reps Only Exercise',
+      categoryId: categories[0].id,
+      exerciseTypeId: 7,
+    })
+
+    const updated = exercisesServer.updateExercise({
+      id: created.id,
+      name: 'Reps Only Exercise Renamed',
+      categoryId: created.categoryId,
+    })
+    expect(updated.exerciseTypeId).toBe(7)
+  })
+
   it('integration: importing then editing leaves the original-import baseline byte-identical (KTD9)', async () => {
     const fs = await import('node:fs')
     const before = fs.readFileSync(ctx.dbModule.ORIGINAL_IMPORT_DB_PATH)
