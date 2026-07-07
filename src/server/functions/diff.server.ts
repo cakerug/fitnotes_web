@@ -93,6 +93,8 @@ export function getExportDiffSummary(): ExportDiffSummary {
       diffTable(workingDb, baselineDb, 'RoutineSection'),
       diffTable(workingDb, baselineDb, 'RoutineSectionExercise'),
       diffTable(workingDb, baselineDb, 'RoutineSectionExerciseSet'),
+      diffTable(workingDb, baselineDb, 'WorkoutGroup'),
+      diffTable(workingDb, baselineDb, 'WorkoutGroupExercise'),
     ]
       .map(structureCounts)
       .reduce(addStructureCounts, { added: 0, modified: 0, removed: 0 })

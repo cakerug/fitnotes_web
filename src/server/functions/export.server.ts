@@ -20,6 +20,8 @@ const MANAGED_TABLES = [
   'RoutineSection',
   'RoutineSectionExercise',
   'RoutineSectionExerciseSet',
+  'WorkoutGroup',
+  'WorkoutGroupExercise',
 ] as const
 
 export type ExportResult =

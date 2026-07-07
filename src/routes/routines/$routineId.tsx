@@ -3,10 +3,14 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
   addExerciseToSectionFn,
+  addExerciseToSupersetFn,
   addSectionFn,
+  createSupersetFn,
   deleteSectionFn,
+  deleteSupersetFn,
   getRoutineFn,
   removeExerciseFromSectionFn,
+  removeExerciseFromSupersetFn,
   renameSectionFn,
   reorderSectionExercisesFn,
   reorderSectionsFn,
@@ -14,7 +18,8 @@ import {
 } from '../../server/functions/routines'
 import { listExercisesFn } from '../../server/functions/exercises'
 import { Modal } from '../../components/Modal'
-import type { RoutineDTO, SectionDTO, SectionExerciseDTO } from '../../server/functions/routines.server'
+import { categoryColorToHex } from '../../lib/categoryColors'
+import type { RoutineDTO, SectionDTO, SectionExerciseDTO, SupersetDTO } from '../../server/functions/routines.server'
 import type { ExerciseDTO } from '../../server/functions/exercises.server'
 
 export const Route = createFileRoute('/routines/$routineId')({
@@ -146,8 +151,8 @@ function SectionCard({
   const addExerciseToSection = useServerFn(addExerciseToSectionFn)
 
   const [name, setName] = useState(section.name)
-  const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [supersetTarget, setSupersetTarget] = useState<SectionExerciseDTO | null>(null)
 
   async function handleRename() {
     if (!name.trim() || name === section.name) return
@@ -156,13 +161,7 @@ function SectionCard({
   }
 
   async function handleDelete() {
-    setBlockedMessage(null)
-    const result = await deleteSection({ data: { id: section.id } })
-    if (result.status === 'blocked') {
-      const refs = result.references.map((r) => `${r.count} ${r.label}`).join(', ')
-      setBlockedMessage(`Can't delete "${section.name}" — still referenced by: ${refs}.`)
-      return
-    }
+    await deleteSection({ data: { id: section.id } })
     await onChange()
   }
 
@@ -214,10 +213,6 @@ function SectionCard({
         </button>
       </div>
 
-      {blockedMessage && (
-        <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-900">{blockedMessage}</div>
-      )}
-
       <div className="mt-4 space-y-3">
         {section.exercises.map((sectionExercise, index) => (
           <SectionExerciseRow
@@ -225,7 +220,9 @@ function SectionCard({
             sectionExercise={sectionExercise}
             exerciseIndex={index}
             allExercises={section.exercises}
+            supersets={section.supersets}
             onChange={onChange}
+            onOpenSupersetPicker={() => setSupersetTarget(sectionExercise)}
           />
         ))}
       </div>
@@ -248,6 +245,14 @@ function SectionCard({
         exercises={exercises}
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddExercise}
+      />
+
+      <SupersetPickerModal
+        sectionId={section.id}
+        supersets={section.supersets}
+        target={supersetTarget}
+        onClose={() => setSupersetTarget(null)}
+        onChange={onChange}
       />
     </div>
   )
@@ -327,15 +332,22 @@ function SectionExerciseRow({
   sectionExercise,
   exerciseIndex,
   allExercises,
+  supersets,
   onChange,
+  onOpenSupersetPicker,
 }: {
   sectionExercise: SectionExerciseDTO
   exerciseIndex: number
   allExercises: Array<SectionExerciseDTO>
+  supersets: Array<SupersetDTO>
   onChange: () => Promise<void>
+  onOpenSupersetPicker: () => void
 }) {
   const removeExerciseFromSection = useServerFn(removeExerciseFromSectionFn)
+  const removeExerciseFromSuperset = useServerFn(removeExerciseFromSupersetFn)
   const reorderSectionExercises = useServerFn(reorderSectionExercisesFn)
+
+  const superset = supersets.find((s) => s.id === sectionExercise.supersetId)
 
   async function handleMove(direction: -1 | 1) {
     const target = exerciseIndex + direction
@@ -348,7 +360,10 @@ function SectionExerciseRow({
   }
 
   return (
-    <div className="rounded border border-gray-100 bg-gray-50 p-3">
+    <div
+      className="rounded border border-gray-100 bg-gray-50 p-3"
+      style={{ borderLeftWidth: 4, borderLeftColor: superset ? categoryColorToHex(superset.colour) : undefined }}
+    >
       <div className="flex items-center gap-2">
         <div className="flex flex-col">
           <button
@@ -369,6 +384,23 @@ function SectionExerciseRow({
           </button>
         </div>
         <span className="flex-1 text-sm font-medium">{sectionExercise.exerciseName}</span>
+        {superset ? (
+          <button
+            type="button"
+            onClick={async () => {
+              await removeExerciseFromSuperset({ data: { sectionExerciseId: sectionExercise.id } })
+              await onChange()
+            }}
+            title={superset.name}
+            className="text-sm text-gray-500"
+          >
+            Remove from superset
+          </button>
+        ) : (
+          <button type="button" onClick={onOpenSupersetPicker} className="text-sm text-blue-600">
+            + Add to superset
+          </button>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -381,5 +413,94 @@ function SectionExerciseRow({
         </button>
       </div>
     </div>
+  )
+}
+
+function SupersetPickerModal({
+  sectionId,
+  supersets,
+  target,
+  onClose,
+  onChange,
+}: {
+  sectionId: number
+  supersets: Array<SupersetDTO>
+  target: SectionExerciseDTO | null
+  onClose: () => void
+  onChange: () => Promise<void>
+}) {
+  const createSuperset = useServerFn(createSupersetFn)
+  const addExerciseToSuperset = useServerFn(addExerciseToSupersetFn)
+  const deleteSuperset = useServerFn(deleteSupersetFn)
+
+  const [newName, setNewName] = useState('')
+
+  async function handlePick(supersetId: number) {
+    if (!target) return
+    await addExerciseToSuperset({ data: { sectionExerciseId: target.id, supersetId } })
+    await onChange()
+    onClose()
+  }
+
+  async function handleCreate() {
+    if (!target) return
+    const created = await createSuperset({ data: { sectionId, name: newName.trim() || undefined } })
+    await addExerciseToSuperset({ data: { sectionExerciseId: target.id, supersetId: created.id } })
+    setNewName('')
+    await onChange()
+    onClose()
+  }
+
+  async function handleDeleteSuperset(supersetId: number) {
+    await deleteSuperset({ data: { id: supersetId } })
+    await onChange()
+  }
+
+  return (
+    <Modal open={target !== null} onClose={onClose} title={`Add ${target?.exerciseName ?? ''} to superset`}>
+      <div className="flex w-64 flex-col gap-3">
+        {supersets.length > 0 && (
+          <ul className="divide-y divide-gray-100 rounded border border-gray-200">
+            {supersets.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 p-2">
+                <button
+                  type="button"
+                  onClick={() => handlePick(s.id)}
+                  className="flex flex-1 items-center gap-2 text-left text-sm"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: categoryColorToHex(s.colour) }}
+                  />
+                  {s.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSuperset(s.id)}
+                  title="Delete superset (keeps its exercises)"
+                  className="text-sm text-red-600"
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            placeholder={`Superset ${supersets.length + 1}`}
+            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+          />
+          <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-1 text-sm text-white">
+            Create new
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }

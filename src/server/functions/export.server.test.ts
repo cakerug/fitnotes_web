@@ -141,6 +141,20 @@ describe('prepareExport', () => {
     expect(result.reason).toBe('integrity-check-failed')
   })
 
+  it('covers superset editing: creating and populating a superset does not trip the passthrough row-count guard', () => {
+    const routine = routinesServer.createRoutine({ name: 'Superset Export Routine' })
+    const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })
+    const exercise = exercisesServer.listExercises()[0]
+    const sectionExercise = routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: exercise.id })
+    const superset = routinesServer.createSuperset({ sectionId: section.id })
+    routinesServer.addExerciseToSuperset({ sectionExerciseId: sectionExercise.id, supersetId: superset.id })
+
+    const result = prepareExport()
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') throw new Error('unreachable')
+    fs.rmSync(result.filePath, { force: true })
+  })
+
   it('edge case: export is blocked if a passthrough table row count differs from the KTD9 baseline', () => {
     const db = ctx.dbModule.getWorkingDb()
     const exerciseId = (db.prepare('SELECT _id FROM exercise LIMIT 1').get() as { _id: number })._id
