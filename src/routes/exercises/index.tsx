@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { deleteExerciseFn, listExerciseLogStatsFn, listExercisesFn } from '../../server/functions/exercises'
+import {
+  countUnusedExercisesFn,
+  deleteExerciseFn,
+  listExerciseLogStatsFn,
+  listExercisesFn,
+  moveUnusedExercisesToCategoryFn,
+} from '../../server/functions/exercises'
 import {
   createCategoryFn,
   deleteCategoryFn,
@@ -98,12 +104,17 @@ function ExerciseListPage() {
   const createCategory = useServerFn(createCategoryFn)
   const updateCategory = useServerFn(updateCategoryFn)
   const deleteCategory = useServerFn(deleteCategoryFn)
+  const countUnusedExercises = useServerFn(countUnusedExercisesFn)
+  const moveUnusedExercisesToCategory = useServerFn(moveUnusedExercisesToCategoryFn)
 
   const [search, setSearch] = useState('')
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [unusedPreviewCount, setUnusedPreviewCount] = useState<number | null>(null)
+  const [unusedMovePending, setUnusedMovePending] = useState(false)
+  const [unusedMoveMessage, setUnusedMoveMessage] = useState<{ tone: 'info' | 'success'; text: string } | null>(null)
 
   const exerciseCountByCategory = useMemo(() => {
     const counts = new Map<number, number>()
@@ -179,14 +190,105 @@ function ExerciseListPage() {
     await router.invalidate()
   }
 
+  async function handlePreviewMoveUnused() {
+    setUnusedMoveMessage(null)
+    const count = await countUnusedExercises()
+    if (count === 0) {
+      setUnusedPreviewCount(null)
+      setUnusedMoveMessage({ tone: 'info', text: 'No unused exercises to move — everything has a logged entry.' })
+      return
+    }
+    setUnusedPreviewCount(count)
+  }
+
+  async function handleConfirmMoveUnused() {
+    setUnusedMovePending(true)
+    try {
+      const { movedCount } = await moveUnusedExercisesToCategory()
+      setUnusedPreviewCount(null)
+      setUnusedMoveMessage({
+        tone: 'success',
+        text: `Moved ${movedCount} exercise${movedCount === 1 ? '' : 's'} into "Unused".`,
+      })
+      await router.invalidate()
+    } finally {
+      setUnusedMovePending(false)
+    }
+  }
+
+  function handleCancelMoveUnused() {
+    setUnusedPreviewCount(null)
+  }
+
   return (
     <div className="mx-auto max-w-5xl p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Exercises</h1>
-        <Link to="/exercises/$exerciseId" params={{ exerciseId: 'new' }} className="text-sm text-blue-600">
-          + Add exercise
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/exercises/$exerciseId" params={{ exerciseId: 'new' }} className="text-sm text-blue-600">
+            + Add exercise
+          </Link>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+              •••
+            </summary>
+            <div className="absolute right-0 z-10 mt-1 w-56 rounded border border-gray-200 bg-white shadow-md">
+              <button
+                type="button"
+                onClick={(e) => {
+                  closeMenu(e)
+                  handlePreviewMoveUnused()
+                }}
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                Move unused to category
+              </button>
+            </div>
+          </details>
+        </div>
       </div>
+
+      {unusedPreviewCount !== null && (
+        <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm text-amber-900">
+            This will move {unusedPreviewCount} exercise{unusedPreviewCount === 1 ? '' : 's'} with no logged entries
+            into a new &quot;Unused&quot; category, prefixing each name with its current category (e.g. &quot;Abs -
+            Incline Crunch&quot;).
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={unusedMovePending}
+              onClick={handleConfirmMoveUnused}
+              className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {unusedMovePending
+                ? 'Moving…'
+                : `Move ${unusedPreviewCount} exercise${unusedPreviewCount === 1 ? '' : 's'}`}
+            </button>
+            <button
+              type="button"
+              disabled={unusedMovePending}
+              onClick={handleCancelMoveUnused}
+              className="rounded bg-gray-200 px-4 py-2 text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {unusedMoveMessage && (
+        <div
+          className={`mt-4 rounded border p-3 text-sm ${
+            unusedMoveMessage.tone === 'success'
+              ? 'border-green-300 bg-green-50 text-green-900'
+              : 'border-gray-300 bg-gray-50 text-gray-700'
+          }`}
+        >
+          {unusedMoveMessage.text}
+        </div>
+      )}
 
       <div className="mt-6 flex gap-6">
         <div className="w-56 shrink-0">

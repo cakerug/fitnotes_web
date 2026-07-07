@@ -1,10 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
 import {
+  countUnusedExercises,
   createExercise,
   deleteExercise,
   getExercise,
   listExerciseLogStats,
   listExercises,
+  moveUnusedExercisesToCategory,
   updateExercise,
 } from './exercises.server'
 import type { ExerciseInput } from './exercises.server'
@@ -30,3 +32,9 @@ export const updateExerciseFn = createServerFn({ method: 'POST' })
 export const deleteExerciseFn = createServerFn({ method: 'POST' })
   .validator((data: { id: number }) => data)
   .handler(async ({ data }) => deleteExercise(data.id))
+
+export const countUnusedExercisesFn = createServerFn({ method: 'GET' }).handler(async () => countUnusedExercises())
+
+export const moveUnusedExercisesToCategoryFn = createServerFn({ method: 'POST' }).handler(async () =>
+  moveUnusedExercisesToCategory(),
+)

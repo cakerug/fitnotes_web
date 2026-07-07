@@ -120,6 +120,48 @@ describe('exercise CRUD', () => {
     expect(stats).toBeUndefined()
   })
 
+  it('happy path: moveUnusedExercisesToCategory renames and recategorizes only never-logged exercises', () => {
+    // Fixture: Squat (Legs) has a training_log row; Lunge (Legs) and Curl (Arms) don't.
+    expect(exercisesServer.countUnusedExercises()).toBe(2)
+
+    const result = exercisesServer.moveUnusedExercisesToCategory()
+    expect(result.movedCount).toBe(2)
+
+    const unusedCategory = categoriesServer.listCategories().find((c) => c.name === 'Unused')
+    expect(unusedCategory).toBeDefined()
+
+    const exercises = exercisesServer.listExercises()
+    const lunge = exercises.find((e) => e.name === 'Legs - Lunge')
+    const curl = exercises.find((e) => e.name === 'Arms - Curl')
+    expect(lunge?.categoryId).toBe(unusedCategory!.id)
+    expect(curl?.categoryId).toBe(unusedCategory!.id)
+
+    const squat = exercises.find((e) => e.name === 'Squat')
+    expect(squat?.categoryId).not.toBe(unusedCategory!.id)
+
+    expect(exercisesServer.countUnusedExercises()).toBe(0)
+  })
+
+  it('edge case: running moveUnusedExercisesToCategory twice does not re-prefix already-moved exercises', () => {
+    exercisesServer.moveUnusedExercisesToCategory()
+    const second = exercisesServer.moveUnusedExercisesToCategory()
+
+    expect(second.movedCount).toBe(0)
+    expect(exercisesServer.listExercises().some((e) => e.name === 'Legs - Legs - Lunge')).toBe(false)
+  })
+
+  it('edge case: reuses an existing "Unused" category instead of creating a duplicate', () => {
+    const existingUnused = categoriesServer.createCategory({ name: 'Unused', colour: 0 })
+    const newExercise = exercisesServer.createExercise({ name: 'Never Logged 2', categoryId: existingUnused.id })
+
+    const result = exercisesServer.moveUnusedExercisesToCategory()
+    expect(result.movedCount).toBe(2)
+    expect(categoriesServer.listCategories().filter((c) => c.name === 'Unused')).toHaveLength(1)
+
+    // Already in Unused, so it's excluded from the move and keeps its original name.
+    expect(exercisesServer.getExercise(newExercise.id).name).toBe('Never Logged 2')
+  })
+
   it('integration: importing then editing leaves the original-import baseline byte-identical (KTD9)', async () => {
     const fs = await import('node:fs')
     const before = fs.readFileSync(ctx.dbModule.ORIGINAL_IMPORT_DB_PATH)
