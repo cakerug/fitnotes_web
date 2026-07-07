@@ -3,8 +3,10 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
+import { hasWorkingDbFn } from '../server/functions/dashboard'
 
 export const Route = createRootRoute({
+  loader: async () => ({ hasWorkingDb: await hasWorkingDbFn() }),
   head: () => ({
     meta: [
       {
@@ -34,6 +36,8 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const { hasWorkingDb } = Route.useLoaderData()
+
   return (
     <html lang="en">
       <head>
@@ -44,15 +48,31 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Link to="/" className="[&.active]:font-bold">
             Home
           </Link>
-          <Link to="/exercises" className="[&.active]:font-bold">
-            Exercises
-          </Link>
-          <Link to="/routines" className="[&.active]:font-bold">
-            Routines
-          </Link>
-          <Link to="/export" className="[&.active]:font-bold">
-            Export
-          </Link>
+          {hasWorkingDb ? (
+            <>
+              <Link to="/exercises" className="[&.active]:font-bold">
+                Exercises
+              </Link>
+              <Link to="/routines" className="[&.active]:font-bold">
+                Routines
+              </Link>
+              <Link to="/export" className="[&.active]:font-bold">
+                Export
+              </Link>
+            </>
+          ) : (
+            <>
+              <span className="cursor-not-allowed text-gray-400" title="Import a backup before this page is available">
+                Exercises
+              </span>
+              <span className="cursor-not-allowed text-gray-400" title="Import a backup before this page is available">
+                Routines
+              </span>
+              <span className="cursor-not-allowed text-gray-400" title="Import a backup before this page is available">
+                Export
+              </span>
+            </>
+          )}
         </nav>
         {children}
         <TanStackDevtools
