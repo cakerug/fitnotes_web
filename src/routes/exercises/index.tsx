@@ -61,7 +61,10 @@ function CategorySwatch({ colour }: { colour: number }) {
 function CategoryColorPicker({ category, onPick }: { category: CategoryDTO; onPick: (hex: string) => void }) {
   return (
     <details className="relative">
-      <summary title="Change colour" className="cursor-pointer list-none rounded">
+      <summary
+        title="Change colour"
+        className="inline-flex cursor-pointer list-none rounded-full ring-2 ring-orange-400 ring-offset-1"
+      >
         <CategorySwatch colour={category.colour} />
       </summary>
       <div className="absolute left-0 z-10 mt-2 grid w-44 grid-cols-5 gap-2 rounded border border-gray-200 bg-white p-3 shadow-md">
@@ -255,20 +258,29 @@ function ExerciseListPage() {
               <div key={category.id} className="rounded border border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   {editingCategoryId === category.id ? (
-                    <input
-                      value={editingCategoryName}
-                      onChange={(e) => setEditingCategoryName(e.target.value)}
-                      onBlur={() => handleRenameCategory(category)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleRenameCategory(category)}
-                      autoFocus
-                      className="rounded border border-gray-300 px-2 py-1 text-sm font-semibold"
-                    />
-                  ) : (
-                    <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <div
+                      className="flex items-center gap-2"
+                      onBlur={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget)) {
+                          handleRenameCategory(category)
+                        }
+                      }}
+                    >
                       <CategoryColorPicker
                         category={category}
                         onPick={(hex) => handleChangeCategoryColor(category, hex)}
                       />
+                      <input
+                        value={editingCategoryName}
+                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRenameCategory(category)}
+                        autoFocus
+                        className="rounded border border-gray-300 px-2 py-1 text-sm font-semibold"
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <CategorySwatch colour={category.colour} />
                       {category.name}
                     </h2>
                   )}
@@ -286,7 +298,7 @@ function ExerciseListPage() {
                         }}
                         className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
-                        Rename
+                        Edit
                       </button>
                       <button
                         type="button"
