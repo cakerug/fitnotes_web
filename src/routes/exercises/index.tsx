@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
-  countUnusedExercisesFn,
   deleteExerciseFn,
   listExerciseLogStatsFn,
   listExercisesFn,
+  listUnusedExercisesFn,
   moveUnusedExercisesToCategoryFn,
 } from '../../server/functions/exercises'
 import {
@@ -18,6 +18,8 @@ import { hasWorkingDbFn } from '../../server/functions/dashboard'
 import type { CategoryDTO } from '../../server/functions/categories.server'
 import type { ExerciseDTO, ExerciseLogStatsDTO } from '../../server/functions/exercises.server'
 import { CATEGORY_COLOR_PALETTE, categoryColorToHex, hexToCategoryColor } from '../../lib/categoryColors'
+import { Modal } from '../../components/Modal'
+import { ExerciseForm } from '../../components/ExerciseForm'
 
 type ExerciseSearch = { category?: number }
 
@@ -107,17 +109,22 @@ function ExerciseListPage() {
   const createCategory = useServerFn(createCategoryFn)
   const updateCategory = useServerFn(updateCategoryFn)
   const deleteCategory = useServerFn(deleteCategoryFn)
-  const countUnusedExercises = useServerFn(countUnusedExercisesFn)
+  const listUnusedExercises = useServerFn(listUnusedExercisesFn)
   const moveUnusedExercisesToCategory = useServerFn(moveUnusedExercisesToCategoryFn)
 
   const [search, setSearch] = useState('')
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
-  const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
-  const [unusedPreviewCount, setUnusedPreviewCount] = useState<number | null>(null)
+  const [unusedPreview, setUnusedPreview] = useState<Array<{ id: number; name: string; categoryName: string }> | null>(
+    null,
+  )
+  const [unusedDetailsOpen, setUnusedDetailsOpen] = useState(false)
   const [unusedMovePending, setUnusedMovePending] = useState(false)
   const [unusedMoveMessage, setUnusedMoveMessage] = useState<{ tone: 'info' | 'success'; text: string } | null>(null)
+  const [addExerciseModal, setAddExerciseModal] = useState<{ defaultCategoryId?: number } | null>(null)
+  const [addCategoryModalOpen, setAddCategoryModalOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
 
   const exerciseCountByCategory = useMemo(() => {
     const counts = new Map<number, number>()
@@ -159,6 +166,7 @@ function ExerciseListPage() {
     if (!newCategoryName.trim()) return
     await createCategory({ data: { name: newCategoryName.trim(), colour: 0 } })
     setNewCategoryName('')
+    setAddCategoryModalOpen(false)
     await router.invalidate()
   }
 
@@ -195,20 +203,21 @@ function ExerciseListPage() {
 
   async function handlePreviewMoveUnused() {
     setUnusedMoveMessage(null)
-    const count = await countUnusedExercises()
-    if (count === 0) {
-      setUnusedPreviewCount(null)
+    const list = await listUnusedExercises()
+    if (list.length === 0) {
+      setUnusedPreview(null)
       setUnusedMoveMessage({ tone: 'info', text: 'No unused exercises to move — everything has a logged entry.' })
       return
     }
-    setUnusedPreviewCount(count)
+    setUnusedDetailsOpen(false)
+    setUnusedPreview(list)
   }
 
   async function handleConfirmMoveUnused() {
     setUnusedMovePending(true)
     try {
       const { movedCount } = await moveUnusedExercisesToCategory()
-      setUnusedPreviewCount(null)
+      setUnusedPreview(null)
       setUnusedMoveMessage({
         tone: 'success',
         text: `Moved ${movedCount} exercise${movedCount === 1 ? '' : 's'} into "Unused".`,
@@ -220,252 +229,305 @@ function ExerciseListPage() {
   }
 
   function handleCancelMoveUnused() {
-    setUnusedPreviewCount(null)
+    setUnusedPreview(null)
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Exercises</h1>
-        <div className="flex items-center gap-4">
-          <Link to="/exercises/$exerciseId" params={{ exerciseId: 'new' }} className="text-sm text-blue-600">
-            + Add exercise
-          </Link>
-          <details className="relative">
-            <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
-              •••
-            </summary>
-            <div className="absolute right-0 z-10 mt-1 w-56 rounded border border-gray-200 bg-white shadow-md">
+    <>
+      <div className="mx-auto max-w-5xl p-8">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Exercises</h1>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={() => setAddExerciseModal({})} className="text-sm text-blue-600">
+              + Add exercise
+            </button>
+            <details className="relative">
+              <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+                •••
+              </summary>
+              <div className="absolute right-0 z-10 mt-1 w-56 rounded border border-gray-200 bg-white shadow-md">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    closeMenu(e)
+                    handlePreviewMoveUnused()
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  Move unused to category
+                </button>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        {unusedPreview !== null && (
+          <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-4">
+            <p className="text-sm text-amber-900">
+              This will move {unusedPreview.length} exercise{unusedPreview.length === 1 ? '' : 's'} with no logged
+              entries into a new &quot;Unused&quot; category, prefixing each name with its current category (e.g.
+              &quot;Abs - Incline Crunch&quot;).
+            </p>
+
+            <details
+              className="mt-2"
+              open={unusedDetailsOpen}
+              onToggle={(e) => setUnusedDetailsOpen(e.currentTarget.open)}
+            >
+              <summary className="cursor-pointer text-sm text-amber-900 underline">Show details</summary>
+              <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded border border-amber-200 bg-white p-2 text-sm text-gray-700">
+                {unusedPreview.map((candidate) => (
+                  <li key={candidate.id}>
+                    {candidate.categoryName} - {candidate.name}
+                  </li>
+                ))}
+              </ul>
+            </details>
+
+            <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                onClick={(e) => {
-                  closeMenu(e)
-                  handlePreviewMoveUnused()
-                }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                disabled={unusedMovePending}
+                onClick={handleConfirmMoveUnused}
+                className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                Move unused to category
+                {unusedMovePending
+                  ? 'Moving…'
+                  : `Move ${unusedPreview.length} exercise${unusedPreview.length === 1 ? '' : 's'}`}
+              </button>
+              <button
+                type="button"
+                disabled={unusedMovePending}
+                onClick={handleCancelMoveUnused}
+                className="rounded bg-gray-200 px-4 py-2 text-sm disabled:opacity-50"
+              >
+                Cancel
               </button>
             </div>
-          </details>
-        </div>
-      </div>
-
-      {unusedPreviewCount !== null && (
-        <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm text-amber-900">
-            This will move {unusedPreviewCount} exercise{unusedPreviewCount === 1 ? '' : 's'} with no logged entries
-            into a new &quot;Unused&quot; category, prefixing each name with its current category (e.g. &quot;Abs -
-            Incline Crunch&quot;).
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              disabled={unusedMovePending}
-              onClick={handleConfirmMoveUnused}
-              className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {unusedMovePending
-                ? 'Moving…'
-                : `Move ${unusedPreviewCount} exercise${unusedPreviewCount === 1 ? '' : 's'}`}
-            </button>
-            <button
-              type="button"
-              disabled={unusedMovePending}
-              onClick={handleCancelMoveUnused}
-              className="rounded bg-gray-200 px-4 py-2 text-sm disabled:opacity-50"
-            >
-              Cancel
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {unusedMoveMessage && (
-        <div
-          className={`mt-4 rounded border p-3 text-sm ${
-            unusedMoveMessage.tone === 'success'
-              ? 'border-green-300 bg-green-50 text-green-900'
-              : 'border-gray-300 bg-gray-50 text-gray-700'
-          }`}
-        >
-          {unusedMoveMessage.text}
-        </div>
-      )}
+        {unusedMoveMessage && (
+          <div
+            className={`mt-4 rounded border p-3 text-sm ${
+              unusedMoveMessage.tone === 'success'
+                ? 'border-green-300 bg-green-50 text-green-900'
+                : 'border-gray-300 bg-gray-50 text-gray-700'
+            }`}
+          >
+            {unusedMoveMessage.text}
+          </div>
+        )}
 
-      <div className="mt-6 flex gap-6">
-        <div className="w-56 shrink-0">
-          <ul className="divide-y divide-gray-200 rounded border border-gray-200">
-            <li>
-              <Link
-                to="/exercises"
-                search={{}}
-                className={`flex items-center justify-between p-3 text-sm ${
-                  selectedCategoryId === undefined ? 'bg-blue-50 font-medium text-blue-900' : 'text-gray-700'
-                }`}
-              >
-                <span>All categories</span>
-                <span className="text-xs text-gray-400">{exercises.length}</span>
-              </Link>
-            </li>
-            {categories.map((category) => (
-              <li key={category.id}>
+        <div className="mt-6 flex gap-6">
+          <div className="w-56 shrink-0">
+            <ul className="divide-y divide-gray-200 rounded border border-gray-200">
+              <li>
                 <Link
                   to="/exercises"
-                  search={{ category: category.id }}
+                  search={{}}
                   className={`flex items-center justify-between p-3 text-sm ${
-                    selectedCategoryId === category.id ? 'bg-blue-50 font-medium text-blue-900' : 'text-gray-700'
+                    selectedCategoryId === undefined ? 'bg-blue-50 font-medium text-blue-900' : 'text-gray-700'
                   }`}
                 >
-                  <span className="flex items-center gap-2">
-                    <CategorySwatch colour={category.colour} />
-                    <span>{category.name}</span>
-                  </span>
-                  <span className="text-xs text-gray-400">{exerciseCountByCategory.get(category.id) ?? 0}</span>
+                  <span>All categories</span>
+                  <span className="text-xs text-gray-400">{exercises.length}</span>
                 </Link>
               </li>
-            ))}
-          </ul>
-
-          <div className="mt-3 flex gap-2">
-            <input
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-              placeholder="New category"
-              className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-            />
-            <button type="button" onClick={handleAddCategory} className="rounded bg-gray-200 px-3 py-1 text-sm">
-              Add
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name…"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-
-          {blockedMessage && (
-            <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-              {blockedMessage}
-            </div>
-          )}
-
-          <div className="mt-3 space-y-4">
-            {groups.map(({ category, exercises: categoryExercises }) => (
-              <div key={category.id} className="rounded border border-gray-200 p-4">
-                <div className="flex items-center justify-between">
-                  {editingCategoryId === category.id ? (
-                    <div
-                      className="flex items-center gap-2"
-                      onBlur={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget)) {
-                          handleRenameCategory(category)
-                        }
-                      }}
-                    >
-                      <CategoryColorPicker
-                        category={category}
-                        onPick={(hex) => handleChangeCategoryColor(category, hex)}
-                      />
-                      <input
-                        value={editingCategoryName}
-                        onChange={(e) => setEditingCategoryName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleRenameCategory(category)}
-                        autoFocus
-                        className="rounded border border-gray-300 px-2 py-1 text-sm font-semibold"
-                      />
-                    </div>
-                  ) : (
-                    <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <Link
+                    to="/exercises"
+                    search={{ category: category.id }}
+                    className={`flex items-center justify-between p-3 text-sm ${
+                      selectedCategoryId === category.id ? 'bg-blue-50 font-medium text-blue-900' : 'text-gray-700'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
                       <CategorySwatch colour={category.colour} />
-                      {category.name}
-                    </h2>
-                  )}
+                      <span>{category.name}</span>
+                    </span>
+                    <span className="text-xs text-gray-400">{exerciseCountByCategory.get(category.id) ?? 0}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
 
-                  <details className="relative">
-                    <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
-                      •••
-                    </summary>
-                    <div className="absolute right-0 z-10 mt-1 w-32 rounded border border-gray-200 bg-white shadow-md">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          closeMenu(e)
-                          startEditingCategory(category)
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          closeMenu(e)
-                          handleDeleteCategory(category)
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </details>
-                </div>
+            <div className="mt-3">
+              <button type="button" onClick={() => setAddCategoryModalOpen(true)} className="text-sm text-blue-600">
+                + New category
+              </button>
+            </div>
+          </div>
 
-                <ul className="mt-3 divide-y divide-gray-100 rounded border border-gray-100 bg-gray-50">
-                  {categoryExercises.map((exercise) => (
-                    <li key={exercise.id} className="flex items-center justify-between p-3">
-                      <Link
-                        to="/exercises/$exerciseId"
-                        params={{ exerciseId: String(exercise.id) }}
-                        className="text-sm font-medium text-blue-700"
-                      >
-                        {exercise.name}
-                      </Link>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-400">
-                          {formatLoggedStats(logStatsByExerciseId.get(exercise.id))}
-                        </span>
-                        <details className="relative">
-                          <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
-                            •••
-                          </summary>
-                          <div className="absolute right-0 z-10 mt-1 w-32 rounded border border-gray-200 bg-white shadow-md">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                closeMenu(e)
-                                handleDeleteExercise(exercise.id, exercise.name)
-                              }}
-                              className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </details>
-                      </div>
-                    </li>
-                  ))}
-                  {categoryExercises.length === 0 && (
-                    <li className="p-3 text-sm text-gray-500">
-                      {search.trim() ? 'No exercises match.' : 'No exercises in this category yet.'}
-                    </li>
-                  )}
-                </ul>
-              </div>
-            ))}
-            {groups.length === 0 && (
-              <div className="rounded border border-gray-200 p-3 text-sm text-gray-500">
-                {categories.length === 0 ? 'No categories yet — add one to get started.' : 'No exercises match.'}
+          <div className="flex-1">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name…"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            />
+
+            {blockedMessage && (
+              <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                {blockedMessage}
               </div>
             )}
+
+            <div className="mt-3 space-y-4">
+              {groups.map(({ category, exercises: categoryExercises }) => (
+                <div key={category.id} className="rounded border border-gray-200 p-4">
+                  <div className="flex items-center justify-between">
+                    {editingCategoryId === category.id ? (
+                      <div
+                        className="flex items-center gap-2"
+                        onBlur={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget)) {
+                            handleRenameCategory(category)
+                          }
+                        }}
+                      >
+                        <CategoryColorPicker
+                          category={category}
+                          onPick={(hex) => handleChangeCategoryColor(category, hex)}
+                        />
+                        <input
+                          value={editingCategoryName}
+                          onChange={(e) => setEditingCategoryName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleRenameCategory(category)}
+                          autoFocus
+                          className="rounded border border-gray-300 px-2 py-1 text-sm font-semibold"
+                        />
+                      </div>
+                    ) : (
+                      <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                        <CategorySwatch colour={category.colour} />
+                        {category.name}
+                      </h2>
+                    )}
+
+                    <details className="relative">
+                      <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+                        •••
+                      </summary>
+                      <div className="absolute right-0 z-10 mt-1 w-40 rounded border border-gray-200 bg-white shadow-md">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            closeMenu(e)
+                            setAddExerciseModal({ defaultCategoryId: category.id })
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                        >
+                          Add exercise
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            closeMenu(e)
+                            startEditingCategory(category)
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            closeMenu(e)
+                            handleDeleteCategory(category)
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+
+                  <ul className="mt-3 divide-y divide-gray-100 rounded border border-gray-100 bg-gray-50">
+                    {categoryExercises.map((exercise) => (
+                      <li key={exercise.id} className="flex items-center justify-between p-3">
+                        <Link
+                          to="/exercises/$exerciseId"
+                          params={{ exerciseId: String(exercise.id) }}
+                          className="text-sm font-medium text-blue-700"
+                        >
+                          {exercise.name}
+                        </Link>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400">
+                            {formatLoggedStats(logStatsByExerciseId.get(exercise.id))}
+                          </span>
+                          <details className="relative">
+                            <summary className="cursor-pointer list-none rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+                              •••
+                            </summary>
+                            <div className="absolute right-0 z-10 mt-1 w-32 rounded border border-gray-200 bg-white shadow-md">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  closeMenu(e)
+                                  handleDeleteExercise(exercise.id, exercise.name)
+                                }}
+                                className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </details>
+                        </div>
+                      </li>
+                    ))}
+                    {categoryExercises.length === 0 && (
+                      <li className="p-3 text-sm text-gray-500">
+                        {search.trim() ? 'No exercises match.' : 'No exercises in this category yet.'}
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ))}
+              {groups.length === 0 && (
+                <div className="rounded border border-gray-200 p-3 text-sm text-gray-500">
+                  {categories.length === 0 ? 'No categories yet — add one to get started.' : 'No exercises match.'}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <Modal open={addExerciseModal !== null} onClose={() => setAddExerciseModal(null)} title="Add exercise">
+        <ExerciseForm
+          categories={categories}
+          defaultCategoryId={addExerciseModal?.defaultCategoryId}
+          onSaved={async () => {
+            setAddExerciseModal(null)
+            await router.invalidate()
+          }}
+          onCancel={() => setAddExerciseModal(null)}
+        />
+      </Modal>
+
+      <Modal open={addCategoryModalOpen} onClose={() => setAddCategoryModalOpen(false)} title="New category">
+        <div className="flex gap-2">
+          <input
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+            placeholder="Category name"
+            autoFocus
+            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleAddCategory}
+            className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+          >
+            Save
+          </button>
+        </div>
+      </Modal>
+    </>
   )
 }

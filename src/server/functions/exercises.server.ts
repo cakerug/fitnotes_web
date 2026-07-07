@@ -192,6 +192,12 @@ export function countUnusedExercises(): number {
   return listUnusedCandidates(db, findUnusedCategoryId(db)).length
 }
 
+/** Preview list for the confirm dialog: every exercise `moveUnusedExercisesToCategory` would touch. */
+export function listUnusedExercises(): Array<UnusedCandidate> {
+  const db = getWorkingDb()
+  return listUnusedCandidates(db, findUnusedCategoryId(db))
+}
+
 /**
  * Moves every exercise with no training-log entries into the "Unused" category
  * (created on first use), prefixing its name with its prior category's name so
