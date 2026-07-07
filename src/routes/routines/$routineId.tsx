@@ -4,15 +4,12 @@ import { useServerFn } from '@tanstack/react-start'
 import {
   addExerciseToSectionFn,
   addSectionFn,
-  addSetFn,
   deleteSectionFn,
   getRoutineFn,
   removeExerciseFromSectionFn,
-  removeSetFn,
   renameSectionFn,
   reorderSectionExercisesFn,
   reorderSectionsFn,
-  reorderSetsFn,
   updateRoutineFn,
 } from '../../server/functions/routines'
 import { listExercisesFn } from '../../server/functions/exercises'
@@ -226,7 +223,7 @@ function SectionCard({
         ))}
       </div>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex items-center gap-2">
         <select
           value={pickedExerciseId}
           onChange={(e) => setPickedExerciseId(Number(e.target.value))}
@@ -241,6 +238,12 @@ function SectionCard({
         <button type="button" onClick={handleAddExercise} className="rounded bg-gray-200 px-3 py-1 text-sm">
           + Add exercise
         </button>
+        <span
+          title='All exercises are added using "Copy previous workout" sets.'
+          className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-gray-400 text-[10px] font-semibold text-gray-500"
+        >
+          i
+        </span>
       </div>
     </div>
   )
@@ -259,12 +262,6 @@ function SectionExerciseRow({
 }) {
   const removeExerciseFromSection = useServerFn(removeExerciseFromSectionFn)
   const reorderSectionExercises = useServerFn(reorderSectionExercisesFn)
-  const addSet = useServerFn(addSetFn)
-  const removeSet = useServerFn(removeSetFn)
-  const reorderSets = useServerFn(reorderSetsFn)
-
-  const [weight, setWeight] = useState('')
-  const [reps, setReps] = useState('')
 
   async function handleMove(direction: -1 | 1) {
     const target = exerciseIndex + direction
@@ -273,29 +270,6 @@ function SectionExerciseRow({
     const [moved] = reordered.splice(exerciseIndex, 1)
     reordered.splice(target, 0, moved)
     await reorderSectionExercises({ data: { orderedIds: reordered.map((e) => e.id) } })
-    await onChange()
-  }
-
-  async function handleAddSet() {
-    if (!weight || !reps) return
-    await addSet({ data: { sectionExerciseId: sectionExercise.id, metricWeight: Number(weight), reps: Number(reps) } })
-    setWeight('')
-    setReps('')
-    await onChange()
-  }
-
-  async function handleRemoveSet(setId: number) {
-    await removeSet({ data: { id: setId } })
-    await onChange()
-  }
-
-  async function handleReorderSets(setIndex: number, direction: -1 | 1) {
-    const target = setIndex + direction
-    if (target < 0 || target >= sectionExercise.sets.length) return
-    const reordered = [...sectionExercise.sets]
-    const [moved] = reordered.splice(setIndex, 1)
-    reordered.splice(target, 0, moved)
-    await reorderSets({ data: { orderedIds: reordered.map((s) => s.id) } })
     await onChange()
   }
 
@@ -330,55 +304,6 @@ function SectionExerciseRow({
           className="text-sm text-red-600"
         >
           Remove
-        </button>
-      </div>
-
-      <ul className="mt-2 space-y-1">
-        {sectionExercise.sets.map((set, setIndex) => (
-          <li key={set.id} className="flex items-center gap-2 text-sm">
-            <button
-              type="button"
-              disabled={setIndex === 0}
-              onClick={() => handleReorderSets(setIndex, -1)}
-              className="text-xs text-gray-400 disabled:opacity-30"
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              disabled={setIndex === sectionExercise.sets.length - 1}
-              onClick={() => handleReorderSets(setIndex, 1)}
-              className="text-xs text-gray-400 disabled:opacity-30"
-            >
-              ▼
-            </button>
-            <span>
-              {set.metricWeight} kg × {set.reps} reps
-            </span>
-            <button type="button" onClick={() => handleRemoveSet(set.id)} className="text-xs text-red-600">
-              remove
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          placeholder="Weight"
-          type="number"
-          className="w-20 rounded border border-gray-300 px-2 py-1 text-sm"
-        />
-        <input
-          value={reps}
-          onChange={(e) => setReps(e.target.value)}
-          placeholder="Reps"
-          type="number"
-          className="w-20 rounded border border-gray-300 px-2 py-1 text-sm"
-        />
-        <button type="button" onClick={handleAddSet} className="rounded bg-gray-200 px-3 py-1 text-sm">
-          + Add set
         </button>
       </div>
     </div>
