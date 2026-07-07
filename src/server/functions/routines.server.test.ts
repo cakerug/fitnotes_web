@@ -36,6 +36,19 @@ describe('routine CRUD', () => {
     expect(full.sections[0].exercises[0].sets[0]).toMatchObject({ metricWeight: 20, reps: 10 })
   })
 
+  it('happy path: adding an exercise to a section hardcodes populate_sets_type to "Copy previous workout"', () => {
+    const routine = routinesServer.createRoutine({ name: 'Populate Sets Test' })
+    const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })
+    const exercise = exercisesServer.listExercises()[0]
+    const sectionExercise = routinesServer.addExerciseToSection({ sectionId: section.id, exerciseId: exercise.id })
+
+    const db = ctx.dbModule.getWorkingDb()
+    const row = db
+      .prepare('SELECT populate_sets_type FROM RoutineSectionExercise WHERE _id = ?')
+      .get(sectionExercise.id) as { populate_sets_type: number }
+    expect(row.populate_sets_type).toBe(2)
+  })
+
   it('happy path: reordering exercises within a section persists sort_order (KTD6)', () => {
     const routine = routinesServer.createRoutine({ name: 'Reorder Test' })
     const section = routinesServer.addSection({ routineId: routine.id, name: 'Main' })

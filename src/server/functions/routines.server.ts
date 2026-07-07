@@ -42,6 +42,9 @@ export type RoutineSummaryDTO = {
 
 export type DeleteResult = { status: 'success' } | { status: 'blocked'; references: Array<ReferenceCheck> }
 
+/** FitNotes' populate_sets_type enum is undocumented; 2 = "Copy previous workout" (inferred from backup data — see plan doc). */
+const POPULATE_SETS_TYPE_COPY_PREVIOUS_WORKOUT = 2
+
 export function listRoutines(): Array<RoutineSummaryDTO> {
   const db = getWorkingDb()
   const rows = db
@@ -220,8 +223,10 @@ export function addExerciseToSection(input: { sectionId: number; exerciseId: num
       .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM RoutineSectionExercise WHERE routine_section_id = ?')
       .get(input.sectionId) as { m: number }
     const result = db
-      .prepare('INSERT INTO RoutineSectionExercise (routine_section_id, exercise_id, sort_order) VALUES (?, ?, ?)')
-      .run(input.sectionId, input.exerciseId, maxSort.m + 1)
+      .prepare(
+        'INSERT INTO RoutineSectionExercise (routine_section_id, exercise_id, sort_order, populate_sets_type) VALUES (?, ?, ?, ?)',
+      )
+      .run(input.sectionId, input.exerciseId, maxSort.m + 1, POPULATE_SETS_TYPE_COPY_PREVIOUS_WORKOUT)
     return Number(result.lastInsertRowid)
   })
 
