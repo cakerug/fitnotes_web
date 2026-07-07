@@ -1,9 +1,11 @@
 import { EXERCISE_REFERENCE_QUERIES, findReferences, findRepMaxGridReferences, getWorkingDb } from '../db.server'
 import type { ReferenceCheck } from '../db.server'
 
-// KTD5: exercise editable field scope. `_id` fields are never editable, and
-// technical fields (exercise_type_id, default_rest_time, default_graph_id,
-// weight_unit_id, is_favourite) are preserved but not exposed for editing.
+// KTD5: exercise editable field scope. `_id` fields are never editable.
+// exercise_type_id is now user-editable (see src/lib/exerciseTypes.ts for
+// what its values mean); the remaining technical fields (default_rest_time,
+// default_graph_id, weight_unit_id, is_favourite) are still preserved as
+// imported but not exposed for editing.
 export type ExerciseDTO = {
   id: number
   name: string
@@ -78,6 +80,8 @@ export type ExerciseInput = {
   categoryId: number
   notes?: string | null
   weightIncrement?: number | null
+  /** Defaults to 0 (Weight & Reps, FitNotes' own default) on create; left untouched on update if omitted. */
+  exerciseTypeId?: number
 }
 
 export function createExercise(input: ExerciseInput): ExerciseDTO {
@@ -88,9 +92,9 @@ export function createExercise(input: ExerciseInput): ExerciseDTO {
   const create = db.transaction(() => {
     const result = db
       .prepare(
-        'INSERT INTO exercise (name, category_id, notes, weight_increment, exercise_type_id, weight_unit_id, is_favourite) VALUES (?, ?, ?, ?, 0, 0, 0)',
+        'INSERT INTO exercise (name, category_id, notes, weight_increment, exercise_type_id, weight_unit_id, is_favourite) VALUES (?, ?, ?, ?, ?, 0, 0)',
       )
-      .run(name, input.categoryId, input.notes ?? null, input.weightIncrement ?? null)
+      .run(name, input.categoryId, input.notes ?? null, input.weightIncrement ?? null, input.exerciseTypeId ?? 0)
     return db.prepare('SELECT * FROM exercise WHERE _id = ?').get(result.lastInsertRowid) as ExerciseRow
   })
 
@@ -102,11 +106,17 @@ export function updateExercise(input: ExerciseInput & { id: number }): ExerciseD
   const name = input.name.trim()
   if (!name) throw new Error('Exercise name is required.')
 
-  db.prepare('UPDATE exercise SET name = ?, category_id = ?, notes = ?, weight_increment = ? WHERE _id = ?').run(
+  // exercise_type_id uses COALESCE so an omitted value leaves the existing type untouched
+  // rather than resetting it to 0 — callers that don't manage this field (e.g. older tests)
+  // must not silently wipe it.
+  db.prepare(
+    'UPDATE exercise SET name = ?, category_id = ?, notes = ?, weight_increment = ?, exercise_type_id = COALESCE(?, exercise_type_id) WHERE _id = ?',
+  ).run(
     name,
     input.categoryId,
     input.notes ?? null,
     input.weightIncrement ?? null,
+    input.exerciseTypeId ?? null,
     input.id,
   )
   return getExercise(input.id)
