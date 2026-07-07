@@ -77,22 +77,30 @@ export function getExercise(id: number): ExerciseDTO {
 
 export type ExerciseInput = {
   name: string
-  categoryId: number
+  categoryId: number | null | undefined
   notes?: string | null
   weightIncrement?: number | null
+}
+
+function assertValidCategory(db: ReturnType<typeof getWorkingDb>, categoryId: number | null | undefined): number {
+  if (!categoryId) throw new Error('Category is required.')
+  const row = db.prepare('SELECT _id FROM Category WHERE _id = ?').get(categoryId) as { _id: number } | undefined
+  if (!row) throw new Error('Category not found.')
+  return categoryId
 }
 
 export function createExercise(input: ExerciseInput): ExerciseDTO {
   const db = getWorkingDb()
   const name = input.name.trim()
   if (!name) throw new Error('Exercise name is required.')
+  const categoryId = assertValidCategory(db, input.categoryId)
 
   const create = db.transaction(() => {
     const result = db
       .prepare(
         'INSERT INTO exercise (name, category_id, notes, weight_increment, exercise_type_id, weight_unit_id, is_favourite) VALUES (?, ?, ?, ?, 0, 0, 0)',
       )
-      .run(name, input.categoryId, input.notes ?? null, input.weightIncrement ?? null)
+      .run(name, categoryId, input.notes ?? null, input.weightIncrement ?? null)
     return db.prepare('SELECT * FROM exercise WHERE _id = ?').get(result.lastInsertRowid) as ExerciseRow
   })
 
@@ -103,10 +111,11 @@ export function updateExercise(input: ExerciseInput & { id: number }): ExerciseD
   const db = getWorkingDb()
   const name = input.name.trim()
   if (!name) throw new Error('Exercise name is required.')
+  const categoryId = assertValidCategory(db, input.categoryId)
 
   db.prepare('UPDATE exercise SET name = ?, category_id = ?, notes = ?, weight_increment = ? WHERE _id = ?').run(
     name,
-    input.categoryId,
+    categoryId,
     input.notes ?? null,
     input.weightIncrement ?? null,
     input.id,

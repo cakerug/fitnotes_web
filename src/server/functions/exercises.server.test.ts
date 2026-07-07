@@ -83,6 +83,18 @@ describe('exercise CRUD', () => {
     expect(() => exercisesServer.createExercise({ name: '  ', categoryId: categories[0].id })).toThrow()
   })
 
+  it('edge case: rejects creating an exercise with no categoryId', () => {
+    expect(() => exercisesServer.createExercise({ name: 'No Category', categoryId: undefined })).toThrow(
+      'Category is required.',
+    )
+  })
+
+  it('edge case: rejects creating an exercise with a non-existent categoryId', () => {
+    expect(() => exercisesServer.createExercise({ name: 'Bad Category', categoryId: 999999 })).toThrow(
+      'Category not found.',
+    )
+  })
+
   it('integration: recategorizing an exercise is reflected in category-filtered listing', () => {
     const categories = categoriesServer.listCategories()
     const [categoryA, categoryB] = categories
