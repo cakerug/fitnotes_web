@@ -79,24 +79,32 @@ export function getExercise(id: number): ExerciseDTO {
 
 export type ExerciseInput = {
   name: string
-  categoryId: number
+  categoryId: number | null | undefined
   notes?: string | null
   weightIncrement?: number | null
   /** Defaults to 0 (Weight & Reps, FitNotes' own default) on create; left untouched on update if omitted. */
   exerciseTypeId?: number
 }
 
+function assertValidCategory(db: ReturnType<typeof getWorkingDb>, categoryId: number | null | undefined): number {
+  if (!categoryId) throw new Error('Category is required.')
+  const row = db.prepare('SELECT _id FROM Category WHERE _id = ?').get(categoryId) as { _id: number } | undefined
+  if (!row) throw new Error('Category not found.')
+  return categoryId
+}
+
 export function createExercise(input: ExerciseInput): ExerciseDTO {
   const db = getWorkingDb()
   const name = input.name.trim()
   if (!name) throw new Error('Exercise name is required.')
+  const categoryId = assertValidCategory(db, input.categoryId)
 
   const create = db.transaction(() => {
     const result = db
       .prepare(
         'INSERT INTO exercise (name, category_id, notes, weight_increment, exercise_type_id, weight_unit_id, is_favourite) VALUES (?, ?, ?, ?, ?, 0, 0)',
       )
-      .run(name, input.categoryId, input.notes ?? null, input.weightIncrement ?? null, input.exerciseTypeId ?? 0)
+      .run(name, categoryId, input.notes ?? null, input.weightIncrement ?? null, input.exerciseTypeId ?? 0)
     return db.prepare('SELECT * FROM exercise WHERE _id = ?').get(result.lastInsertRowid) as ExerciseRow
   })
 
@@ -107,20 +115,14 @@ export function updateExercise(input: ExerciseInput & { id: number }): ExerciseD
   const db = getWorkingDb()
   const name = input.name.trim()
   if (!name) throw new Error('Exercise name is required.')
+  const categoryId = assertValidCategory(db, input.categoryId)
 
   // exercise_type_id uses COALESCE so an omitted value leaves the existing type untouched
   // rather than resetting it to 0 — callers that don't manage this field (e.g. older tests)
   // must not silently wipe it.
   db.prepare(
     'UPDATE exercise SET name = ?, category_id = ?, notes = ?, weight_increment = ?, exercise_type_id = COALESCE(?, exercise_type_id) WHERE _id = ?',
-  ).run(
-    name,
-    input.categoryId,
-    input.notes ?? null,
-    input.weightIncrement ?? null,
-    input.exerciseTypeId ?? null,
-    input.id,
-  )
+  ).run(name, categoryId, input.notes ?? null, input.weightIncrement ?? null, input.exerciseTypeId ?? null, input.id)
   return getExercise(input.id)
 }
 
@@ -191,6 +193,12 @@ function listUnusedCandidates(
 export function countUnusedExercises(): number {
   const db = getWorkingDb()
   return listUnusedCandidates(db, findUnusedCategoryId(db)).length
+}
+
+/** Preview list for the confirm dialog: every exercise `moveUnusedExercisesToCategory` would touch. */
+export function listUnusedExercises(): Array<UnusedCandidate> {
+  const db = getWorkingDb()
+  return listUnusedCandidates(db, findUnusedCategoryId(db))
 }
 
 /**

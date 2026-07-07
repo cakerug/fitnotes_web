@@ -6,6 +6,7 @@ import {
   getExercise,
   listExerciseLogStats,
   listExercises,
+  listUnusedExercises,
   moveUnusedExercisesToCategory,
   updateExercise,
 } from './exercises.server'
@@ -34,6 +35,8 @@ export const deleteExerciseFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => deleteExercise(data.id))
 
 export const countUnusedExercisesFn = createServerFn({ method: 'GET' }).handler(async () => countUnusedExercises())
+
+export const listUnusedExercisesFn = createServerFn({ method: 'GET' }).handler(async () => listUnusedExercises())
 
 export const moveUnusedExercisesToCategoryFn = createServerFn({ method: 'POST' }).handler(async () =>
   moveUnusedExercisesToCategory(),

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
   addExerciseToSectionFn,
@@ -13,6 +13,7 @@ import {
   updateRoutineFn,
 } from '../../server/functions/routines'
 import { listExercisesFn } from '../../server/functions/exercises'
+import { Modal } from '../../components/Modal'
 import type { RoutineDTO, SectionDTO, SectionExerciseDTO } from '../../server/functions/routines.server'
 import type { ExerciseDTO } from '../../server/functions/exercises.server'
 
@@ -37,7 +38,13 @@ function RoutineDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-8">
-      <RoutineHeader routine={routine} onSaved={refresh} />
+      <Link to="/routines" className="text-sm text-blue-600">
+        ← Back
+      </Link>
+
+      <div className="mt-4">
+        <RoutineHeader routine={routine} onSaved={refresh} />
+      </div>
 
       <div className="mt-8 space-y-6">
         {routine.sections.map((section, index) => (
@@ -140,7 +147,7 @@ function SectionCard({
 
   const [name, setName] = useState(section.name)
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
-  const [pickedExerciseId, setPickedExerciseId] = useState<number | undefined>(exercises[0]?.id)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   async function handleRename() {
     if (!name.trim() || name === section.name) return
@@ -169,10 +176,10 @@ function SectionCard({
     await onChange()
   }
 
-  async function handleAddExercise() {
-    if (pickedExerciseId === undefined) return
-    await addExerciseToSection({ data: { sectionId: section.id, exerciseId: pickedExerciseId } })
+  async function handleAddExercise(exerciseId: number) {
+    await addExerciseToSection({ data: { sectionId: section.id, exerciseId } })
     await onChange()
+    setIsAddModalOpen(false)
   }
 
   return (
@@ -224,18 +231,7 @@ function SectionCard({
       </div>
 
       <div className="mt-4 flex items-center gap-2">
-        <select
-          value={pickedExerciseId}
-          onChange={(e) => setPickedExerciseId(Number(e.target.value))}
-          className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-        >
-          {exercises.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.name}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={handleAddExercise} className="rounded bg-gray-200 px-3 py-1 text-sm">
+        <button type="button" onClick={() => setIsAddModalOpen(true)} className="text-sm text-blue-600">
           + Add exercise
         </button>
         <span
@@ -245,7 +241,85 @@ function SectionCard({
           i
         </span>
       </div>
+
+      <AddExerciseModal
+        open={isAddModalOpen}
+        sectionName={section.name}
+        exercises={exercises}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddExercise}
+      />
     </div>
+  )
+}
+
+function AddExerciseModal({
+  open,
+  sectionName,
+  exercises,
+  onClose,
+  onAdd,
+}: {
+  open: boolean
+  sectionName: string
+  exercises: Array<ExerciseDTO>
+  onClose: () => void
+  onAdd: (exerciseId: number) => Promise<void>
+}) {
+  const [search, setSearch] = useState('')
+  const [pickedExerciseId, setPickedExerciseId] = useState<number | ''>('')
+
+  const filteredExercises = exercises.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
+  const selectedId = pickedExerciseId === '' ? filteredExercises.at(0)?.id : pickedExerciseId
+
+  function handleClose() {
+    setSearch('')
+    setPickedExerciseId('')
+    onClose()
+  }
+
+  async function handleConfirm() {
+    if (selectedId === undefined) return
+    await onAdd(selectedId)
+    setSearch('')
+    setPickedExerciseId('')
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title={`Add exercise to ${sectionName}`}>
+      <div className="flex w-64 flex-col gap-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name…"
+          className="rounded border border-gray-300 px-2 py-1 text-sm"
+        />
+        <select
+          value={selectedId ?? ''}
+          onChange={(e) => setPickedExerciseId(Number(e.target.value))}
+          className="rounded border border-gray-300 px-2 py-1 text-sm"
+        >
+          {filteredExercises.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={handleClose} className="rounded px-3 py-1 text-sm text-gray-600">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={filteredExercises.length === 0}
+            className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
