@@ -1,5 +1,7 @@
 import { EXERCISE_REFERENCE_QUERIES, findReferences, findRepMaxGridReferences, getWorkingDb } from '../db.server'
 import type { ReferenceCheck } from '../db.server'
+import { createCategory } from './categories.server'
+import { hexToCategoryColor } from '../../lib/categoryColors'
 
 // KTD5: exercise editable field scope. `_id` fields are never editable, and
 // technical fields (exercise_type_id, default_rest_time, default_graph_id,
@@ -144,4 +146,64 @@ export function deleteExercise(id: number): DeleteResult {
     return { status: 'success' }
   })
   return doDelete(id)
+}
+
+export const UNUSED_CATEGORY_NAME = 'Unused'
+const UNUSED_CATEGORY_COLOUR = hexToCategoryColor('#757575')
+
+type UnusedCandidate = { id: number; name: string; categoryName: string }
+
+function findUnusedCategoryId(db: ReturnType<typeof getWorkingDb>): number | null {
+  const row = db.prepare('SELECT _id FROM Category WHERE name = ?').get(UNUSED_CATEGORY_NAME) as
+    { _id: number } | undefined
+  return row?._id ?? null
+}
+
+/** Exercises with no training-log entries, excluding any already sitting in the Unused category. */
+function listUnusedCandidates(
+  db: ReturnType<typeof getWorkingDb>,
+  unusedCategoryId: number | null,
+): Array<UnusedCandidate> {
+  const excludeClause = unusedCategoryId !== null ? 'AND e.category_id != ?' : ''
+  const params = unusedCategoryId !== null ? [unusedCategoryId] : []
+  const rows = db
+    .prepare(
+      `SELECT e._id AS id, e.name AS name, c.name AS category_name
+       FROM exercise e
+       JOIN Category c ON c._id = e.category_id
+       WHERE NOT EXISTS (SELECT 1 FROM training_log t WHERE t.exercise_id = e._id) ${excludeClause}`,
+    )
+    .all(...params) as Array<{ id: number; name: string; category_name: string }>
+  return rows.map((r) => ({ id: r.id, name: r.name, categoryName: r.category_name }))
+}
+
+/** Preview count for the confirm dialog: how many exercises `moveUnusedExercisesToCategory` would touch. */
+export function countUnusedExercises(): number {
+  const db = getWorkingDb()
+  return listUnusedCandidates(db, findUnusedCategoryId(db)).length
+}
+
+/**
+ * Moves every exercise with no training-log entries into the "Unused" category
+ * (created on first use), prefixing its name with its prior category's name so
+ * the original grouping isn't lost, e.g. "Abs - Incline Crunch" for an
+ * "Incline Crunch" exercise previously filed under "Abs".
+ */
+export function moveUnusedExercisesToCategory(): { movedCount: number } {
+  const db = getWorkingDb()
+  const move = db.transaction((): { movedCount: number } => {
+    const existingUnusedId = findUnusedCategoryId(db)
+    const candidates = listUnusedCandidates(db, existingUnusedId)
+    if (candidates.length === 0) return { movedCount: 0 }
+
+    const unusedId =
+      existingUnusedId ?? createCategory({ name: UNUSED_CATEGORY_NAME, colour: UNUSED_CATEGORY_COLOUR }).id
+
+    const rename = db.prepare('UPDATE exercise SET name = ?, category_id = ? WHERE _id = ?')
+    for (const candidate of candidates) {
+      rename.run(`${candidate.categoryName} - ${candidate.name}`, unusedId, candidate.id)
+    }
+    return { movedCount: candidates.length }
+  })
+  return move()
 }
